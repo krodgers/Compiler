@@ -64,8 +64,8 @@ namespace ScannerParser {
         public String Id2String(int id) {
             if (id < identifiers.Count)
                 return identifiers[id];
-            
-            Error("
+
+            return String.Empty;
 
         }
        
