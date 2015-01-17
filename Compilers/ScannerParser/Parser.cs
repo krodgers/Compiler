@@ -6,11 +6,7 @@ using System.Threading.Tasks;
 
 namespace ScannerParser
 {
-    class Parser
-    {
-        private int scannerSym; // current token on input
-
-        public enum Token
+  public enum Token
         {
             ERROR = 0, TIMES = 1, DIV = 2,
             PLUS = 11, MINUS = 12, EQL = 20,
@@ -23,6 +19,11 @@ namespace ScannerParser
             VAR = 110, ARR, FUNC, PROC,
             BEGIN = 150, MAIN = 200, EOF = 255
         };
-        private void Next();
+    class Parser
+    {
+        private int scannerSym; // current token on input
+
+
+        private void Next() { }
     }
 }

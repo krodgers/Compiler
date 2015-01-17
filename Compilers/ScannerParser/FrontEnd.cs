@@ -6,69 +6,233 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace ScannerParser {
-    public class FileReader {
+    public class Scanner {
+        // current character on input
+        private char? inputSym; //nullable
         private StreamReader input;
 
-        /**
-        Opens the file for parsing
-        */
-        public FileReader(String fileName) {
+        private List<String> identifiers;
+        public int number; // the last nmber encountered
+        public int id; // last identifier encountered
+
+
+        // Opens file and scans first letter
+        public Scanner(String fileName) {
             try {
                 input = new StreamReader(fileName);
             }
-            catch(Exception e) {
+            catch (Exception e) {
                 Error("Failed to open source file.\n" + e.Message);
+                System.Environment.Exit(e.HResult);
+
             }
-        }
-        /**
-        Returns current symbol and advances to the next character on input
-         */
-        public char GetSym();
-
-        public void Error(String errMsg) {
-            input.Close();
-            Console.Error.Write(errMsg);
-
-        }
-        
-
-    }
-
-
-    public class Scanner {
-        // current character on input
-        private char inputSym;
-        private List<String> identifiers;
-        private FileReader reader;
-		public int number; // the last nmber encountered
-        public int id; // last identifier encountered
-        
-
-        // Returns current symbol and advances to next token
-         public int GetSym();
-        
-        // Opens file and scans first letter
-        public Scanner(String fileName) {
-            reader = new FileReader(fileName);
-            inputSym = reader.GetSym();
+            inputSym = (char)NextChar();
             identifiers = new List<String>();
-        }
-        private void Next() {
-            inputSym = reader.GetSym();
-        }
-
-        public void Error(String errMsg) {
-            reader.Error(errMsg);
+            number = Int32.MinValue;
+            id = -1;
         }
 
-        public String Id2String(int id) {
-            if (id < identifiers.Count)
-                return identifiers[id];
+        // Returns current token and advances to next token
+        public Token GetSym() {
+            Token sym = ParseNextToken();
+            return 0;
+        }
 
-            return String.Empty;
+        private Token ParseNextToken() {
+	    if(inputSym == null)
+		return Token.EOF;
+	    Token res;
+	    char currChar = (char)inputSym;
+            Token currToken;
+            try {
+                switch (currChar) {
+		case (char)255:
+		    res =  Token.EOF;
+		    break;
+		case '*':
+		    res =  Token.TIMES;
+		    break;
+		case '/':
+		    if (input.Peek() == '/')                 
+			input.ReadLine(); // is a comment and the line should be skipped		
+		    else
+			res =  Token.DIV;
+		    break;
+		case '+':
+		    res =  Token.PLUS;
+		    break;
+		case '-':
+		    res =  Token.MINUS;
+		    break;
+		case '=': // == 
+		    if(input.Peek() == '=')
+			input.Read(); // eat '='
+		    else
+			Error("Unexpected !\n");
+		    break;
+		case '!':
+		    if(input.Peek() == '=')
+			input.Read(); // eat =
+		    else
+			Error("Unexpected !\n");
+		    break;
+		case '<':
+		    if(input.Peek() == '='){
+			res = Token.LEQ;
+			input.Read();
+		    }  else if(input.Peek() == '-'){
+			res = Token.BECOMES;
+			input.Read();
+		    } else if(char.isNumber(input.Peek()) || char.isWhiteSpace(input.Peek()))
+			res = Token.LSS;
+		    else
+			Error("Invalid character following <\n");
+		   
+		    break;
+		case '>':
+		    if(input.Peek() == '='){
+			res = Token.GEQ;
+			input.Read();
+		    }else if(char.isNumber(input.Peek()) || char.isWhiteSpace(input.Peek()))
+			res = Token.LSS;
+		    else
+			Error("Invalid character following >\n");
+		    inputSym = NextChar(); // put at the beginning of next token
+		    break;
+		case '.':
+		    res = Token.PERIOD;
+		    break;
+		case ',':
+		    res = Token.COMMA;
+		    break;
+		case '[':
+		    res = Token.OPENBRACKET;
+		    break;
+		case ']':
+		    res = Token.CLOSEBRACKET;
+		    break;
+		case '}':
+		    res = Token.END;
+		    break;
+		case ')':
+		    res = Token.CLOSEPAREN;
+		    break;
+		case '(':
+		    res = Token.OPENPAREN;
+		    break;
+		case ';':
+		    res = Token.SEMI;
+		    break;
+		case '{':
+		    res = Token.BEGIN;
+		    break;
+		default:
+		    res = parseWords();
+		      
+                }
+            }
+            catch (Exception e) {
+                Error(e.Message);
+            }
+	    inputSym = NextChar(); // put at beginning of next token
+            return res;
+        }
+
+        // Returns the next non whitespace character in the file
+	private char? NextChar() {
+	    char? curr;
+	    do {
+                if (input.EndOfStream)
+		    return null;
+		curr = (char?)input.Read();
+		
+	    } while (char.IsWhiteSpace(curr));
+
+	    return curr;
 
         }
-       
+	// Returns the token corresponding to the word/number at current file position
+	private Token  parseWords(){
+	    string word = "" + inputSym;
+	    Token res;
+	    while(!input.EndOfStream && char.IsLetterOrDigit(input.Peek())){
+		// consume the whole word
+		word += NextChar();
+	    }
+	    int num;
+	    if(Int32.TryParse(word,num)){
+		number = num;
+	  	res = Token.NUMBER;
+	    } else if(word.compare('then'))
+		res = Token.THEN;
+	    else if(word.compare('do'))
+		res = Token.DO;
+	    else if(word.compare('od'))
+		res = Token.OD;
+	    else if(word.compare('fi'))
+		res = Token.FI;
+	    else if(word.compare('else'))
+		res = Token.ELSE;
+	    else if(word.compare('let'))
+		res = Token.LET;
+	    else if(word.compare('call'))
+		res = Token.CALL;
+	    else if(word.compare('if'))
+		res = Token.IF;
+	    else if(word.compare('while'))
+		res = Token.WHILE;
+	    else if(word.compare('return'))
+		res = Token.RETURN;
+	    else if(word.compare('var'))
+		res = Token.VAR;
+	    else if(word.compare('array'))
+		res = Token.ARR;
+	    else if(word.compare('function'))
+		res = Token.FUNC;
+	    else if(word.compare('procedure'))
+		res = Token.PROCEDURE;
+	    else if(word.compare('main'))
+		res = Token.MAIN;
+	    else {
+		res = Token.IDENT;
+		AddIdent(word);
+	    }
+	    return res;
+	}
+	
+	// Add an identifier to the identifiers list
+	private void AddIdent(String newIdent){
+	    int idx = identifiers.IndexOf(newIdent);
+	    if(idx == -1){
+		identifiers[++id] = newIdent;
+	    }
+	}
+		
+	// Closes the file
+	// Prints out error message
+	// Force quits the program
+	public void Error(String errMsg) {
+	    if (input != null)
+		input.Close();
+	    
+	    Console.Error.Write(errMsg);
+	    
+	}
+	// Returns the identifier with id idx
+	public String Id2String(int idx) {
+	    if (idx < identifiers.Count)
+		return identifiers[idx];
+	    
+	    return String.Empty;
+	    
+	}
+
+	// Returns the id of the identifier 
+	public String String2Id(String identifier) {
+	    return identifiers.IndexOf(identifier);
+	}
+	
+	
     }
 
 }
