@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -22,12 +23,16 @@ namespace ScannerParser
 
     class Parser
     {
-        private int scannerSym; // current token on input
+        private Token scannerSym; // current token on input
         private Scanner scanner;
+        private FileStream fs; //debug
+        private StreamWriter sw;
 
         public Parser(String file)
         {
             scanner = new Scanner(file);
+            fs = File.Open(@"C:\Users\kevin\CS241_Compiler\assembly.txt", FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            sw = new StreamWriter(fs);
         }
 
         private void Next()
@@ -41,86 +46,96 @@ namespace ScannerParser
             switch (scannerSym)
             {
                 #region Symbol Case Statements
-                case (int) Token.ERROR:
+                case Token.ERROR:
+                    Error();
                     break;
-                case (int)Token.TIMES:
+                case Token.TIMES:
                     break;
-                case (int)Token.DIV:
+                case Token.DIV:
                     break;
-                case (int)Token.PLUS:
+                case Token.PLUS:
                     break;
-                case (int)Token.MINUS:
+                case Token.MINUS:
                     break;
-                case (int)Token.EQL:
+                case Token.EQL:
                     break;
-                case (int)Token.NEQ:
+                case Token.NEQ:
                     break;
-                case (int)Token.LSS:
+                case Token.LSS:
                     break;
-                case (int)Token.GEQ:
+                case Token.GEQ:
                     break;
-                case (int)Token.LEQ:
+                case Token.LEQ:
                     break;
-                case (int)Token.GTR:
+                case Token.GTR:
                     break;
-                case (int)Token.PERIOD:
+                case Token.PERIOD:
                     break;
-                case (int)Token.COMMA:
+                case Token.COMMA:
                     break;
-                case (int)Token.OPENBRACKET:
+                case Token.OPENBRACKET:
                     break;
-                case (int)Token.CLOSEBRACKET:
+                case Token.CLOSEBRACKET:
                     break;
-                case (int)Token.CLOSEPAREN:
+                case Token.CLOSEPAREN:
                     break;
-                case (int)Token.BECOMES:
+                case Token.BECOMES:
                     break;
-                case (int)Token.THEN:
+                case Token.THEN:
                     break;
-                case (int)Token.DO:
+                case Token.DO:
                     break;
-                case (int)Token.OPENPAREN:
+                case Token.OPENPAREN:
                     break;
-                case (int)Token.NUMBER:
+                case Token.NUMBER:
                     break;
-                case (int)Token.IDENT:
+                case Token.IDENT:
                     break;
-                case (int)Token.SEMI:
+                case Token.SEMI:
                     break;
-                case (int)Token.END:
+                case Token.END:
                     break;
-                case (int)Token.OD:
+                case Token.OD:
                     break;
-                case (int)Token.FI:
+                case Token.FI:
                     break;
-                case (int)Token.ELSE:
+                case Token.ELSE:
                     break;
-                case (int)Token.LET:
+                case Token.LET:
                     break;
-                case (int)Token.CALL:
+                case Token.CALL:
                     break;
-                case (int)Token.IF:
+                case Token.IF:
                     break;
-                case (int)Token.WHILE:
+                case Token.WHILE:
                     break;
-                case (int)Token.RETURN:
+                case Token.RETURN:
                     break;
-                case (int)Token.VAR:
+                case Token.VAR:
                     break;
-                case (int)Token.ARR:
+                case Token.ARR:
                     break;
-                case (int)Token.FUNC:
+                case Token.FUNC:
                     break;
-                case (int)Token.PROC:
+                case Token.PROC:
                     break;
-                case (int)Token.BEGIN:
+                case Token.BEGIN:
                     break;
-                case (int)Token.MAIN:
+                case Token.MAIN:
                     break;
-                case (int)Token.EOF:
+                case Token.EOF:
                     break;
                 #endregion
             }
         }
+
+        private void Error()
+        {
+            string msg;
+            msg = string.Format("Unexpected {0} {1}, syntax error", scannerSym.ToString(), scanner.Id2String(scanner.id));
+            scanner.Error(msg);
+        }
+
+        
     }
 }
