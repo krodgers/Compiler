@@ -41,7 +41,7 @@ namespace ScannerParser {
         private Token ParseNextToken() {
 	    if(inputSym == null)
 		return Token.EOF;
-	    Token res;
+	    Token res = Token.ERROR;
 	    char currChar = (char)inputSym;
             Token currToken;
             try {
@@ -83,7 +83,7 @@ namespace ScannerParser {
 		    }  else if(input.Peek() == '-'){
 			res = Token.BECOMES;
 			input.Read();
-		    } else if(char.isNumber(input.Peek()) || char.isWhiteSpace(input.Peek()))
+		    } else if(Char.IsNumber((char)input.Peek()) || Char.IsWhiteSpace((char)input.Peek()))
 			res = Token.LSS;
 		    else
 			Error("Invalid character following <\n");
@@ -93,7 +93,7 @@ namespace ScannerParser {
 		    if(input.Peek() == '='){
 			res = Token.GEQ;
 			input.Read();
-		    }else if(char.isNumber(input.Peek()) || char.isWhiteSpace(input.Peek()))
+		    }else if(Char.IsNumber((char)input.Peek()) || Char.IsWhiteSpace((char)input.Peek()))
 			res = Token.LSS;
 		    else
 			Error("Invalid character following >\n");
@@ -128,6 +128,7 @@ namespace ScannerParser {
 		    break;
 		default:
 		    res = parseWords();
+            break;
 		      
                 }
             }
@@ -146,7 +147,7 @@ namespace ScannerParser {
 		    return null;
 		curr = (char?)input.Read();
 		
-	    } while (char.IsWhiteSpace(curr));
+	    } while (char.IsWhiteSpace((char)curr));
 
 	    return curr;
 
@@ -155,43 +156,43 @@ namespace ScannerParser {
 	private Token  parseWords(){
 	    string word = "" + inputSym;
 	    Token res;
-	    while(!input.EndOfStream && char.IsLetterOrDigit(input.Peek())){
+	    while(!input.EndOfStream && char.IsLetterOrDigit((char)input.Peek())){
 		// consume the whole word
-		word += NextChar();
+		word += ((char)NextChar()).ToString();
 	    }
 	    int num;
-	    if(Int32.TryParse(word,num)){
+	    if(Int32.TryParse(word, out num)){
 		number = num;
 	  	res = Token.NUMBER;
-	    } else if(word.compare('then'))
+	    } else if(word.Equals("then"))
 		res = Token.THEN;
-	    else if(word.compare('do'))
+	    else if(word.Equals("do"))
 		res = Token.DO;
-	    else if(word.compare('od'))
+	    else if(word.Equals("od"))
 		res = Token.OD;
-	    else if(word.compare('fi'))
+	    else if(word.Equals("fi"))
 		res = Token.FI;
-	    else if(word.compare('else'))
+	    else if(word.Equals("else"))
 		res = Token.ELSE;
-	    else if(word.compare('let'))
+	    else if(word.Equals("let"))
 		res = Token.LET;
-	    else if(word.compare('call'))
+	    else if(word.Equals("call"))
 		res = Token.CALL;
-	    else if(word.compare('if'))
+	    else if(word.Equals("if"))
 		res = Token.IF;
-	    else if(word.compare('while'))
+	    else if(word.Equals("while"))
 		res = Token.WHILE;
-	    else if(word.compare('return'))
+	    else if(word.Equals("return"))
 		res = Token.RETURN;
-	    else if(word.compare('var'))
+	    else if(word.Equals("var"))
 		res = Token.VAR;
-	    else if(word.compare('array'))
+	    else if(word.Equals("array"))
 		res = Token.ARR;
-	    else if(word.compare('function'))
+	    else if(word.Equals("function"))
 		res = Token.FUNC;
-	    else if(word.compare('procedure'))
-		res = Token.PROCEDURE;
-	    else if(word.compare('main'))
+	    else if(word.Equals("procedure"))
+		res = Token.PROC;
+	    else if(word.Equals("main"))
 		res = Token.MAIN;
 	    else {
 		res = Token.IDENT;
@@ -228,7 +229,7 @@ namespace ScannerParser {
 	}
 
 	// Returns the id of the identifier 
-	public String String2Id(String identifier) {
+	public int String2Id(String identifier) {
 	    return identifiers.IndexOf(identifier);
 	}
 	
