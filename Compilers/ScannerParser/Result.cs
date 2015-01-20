@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ScannerParser {
     public enum Kind { VAR, COND, REG, CONST };
-    public enum CondOp { GT, LT, LEQ, GEQ, EQ, NEQ };
+    public enum CondOp { GT, LT, LEQ, GEQ, EQ, NEQ, ERR };
     class Result {
         public Kind type;
         public int regNo;
@@ -46,6 +46,26 @@ namespace ScannerParser {
         }
         public Result() {
 
+        }
+
+        public static CondOp TokenToCondition(Token cond) {
+            switch (cond)
+            {
+                case Token.GTR:
+                    return CondOp.GT;
+                case Token.LSS:
+                    return CondOp.LT;
+                case Token.LEQ:
+                    return CondOp.LEQ;
+                case Token.GEQ:
+                    return CondOp.GEQ;
+                case Token.EQL:
+                    return CondOp.EQ;
+                case Token.NEQ:
+                    return CondOp.NEQ;
+                default:
+                    return CondOp.ERR;
+            }
         }
 
     }

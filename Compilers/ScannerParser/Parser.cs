@@ -322,6 +322,25 @@ namespace ScannerParser {
             return res;
 
         }
+
+        private Result Relation()
+        {
+            Result res1 = null;
+            Result res2 = null;
+            Result finalResult = null; ;
+
+            res1 = Expression();
+            Next();
+            Token cond = scannerSym;
+            Next();
+            res2 = Expression();
+            Next();
+            finalResult = Combine(cond, res1, res2);
+            finalResult.type = Kind.COND;
+            finalResult.condition = Result.TokenToCondition(cond);
+            return finalResult;
+        }
+
         private Result Combine(Token opCode, Result A, Result B) {
             Result res = new Result();
             res.type = Kind.REG;
