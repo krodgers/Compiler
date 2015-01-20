@@ -53,10 +53,13 @@ namespace ScannerParser {
 		    res =  Token.TIMES;
 		    break;
 		case '/':
-		    if (input.Peek() == '/')                 
-			input.ReadLine(); // is a comment and the line should be skipped		
-		    else
-			res =  Token.DIV;
+            if (input.Peek() == '/') {
+                input.ReadLine(); // is a comment and the line should be skipped	
+    inputSym = NextChar(); // put at beginning of next token
+                return ParseNextToken();
+            }
+            else
+                res = Token.DIV;
 		    break;
 		case '+':
 		    res =  Token.PLUS;
