@@ -80,13 +80,19 @@ namespace ScannerParser
                         break;
                     case '=': // == 
                         if (input.Peek() == '=')
+                        {
                             input.Read(); // eat '='
+                            res = Token.EQL;
+                        }
                         else
                             Error("Unexpected !\n");
                         break;
                     case '!':
                         if (input.Peek() == '=')
+                        {
                             input.Read(); // eat =
+                            res = Token.NEQ;
+                        }
                         else
                             Error("Unexpected !\n");
                         break;
@@ -114,10 +120,9 @@ namespace ScannerParser
                             input.Read();
                         }
                         else if (Char.IsNumber((char)input.Peek()) || Char.IsWhiteSpace((char)input.Peek()))
-                            res = Token.LSS;
+                            res = Token.GTR;
                         else
                             Error("Invalid character following >\n");
-                        inputSym = NextChar(); // put at the beginning of next token
                         break;
                     case '.':
                         res = Token.PERIOD;
