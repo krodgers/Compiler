@@ -32,7 +32,7 @@ namespace ScannerParser
         public Parser(String file)
         {
             scanner = new Scanner(file);
-            fs = File.Open(@"../../output.txt", FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            fs = File.Open(@"../../output.txt", FileMode.Create, FileAccess.ReadWrite);
             sw = new StreamWriter(fs);
         }
 
@@ -177,7 +177,6 @@ namespace ScannerParser
             Result res2;
             Token opCode;
             res = Term();
-            Next(); // TODO:: This here?
             while (scannerSym == Token.PLUS || scannerSym == Token.MINUS)
             {
                 opCode = scannerSym == Token.PLUS ? Token.PLUS : Token.MINUS;
@@ -192,6 +191,7 @@ namespace ScannerParser
 
             return res;
         }
+
         private Result Term()
         {
             Result res = null, resB = null;
@@ -221,6 +221,7 @@ namespace ScannerParser
             }
             return res;
         }
+
         private Result Factor()
         {
             Result res = null;
@@ -256,13 +257,13 @@ namespace ScannerParser
             }
             return res;
         }
+
         private Result Designator()
         {
             Result res, expr;
             if (scannerSym == Token.IDENT)
             {
                 res = Ident();
-                Next();
                 if (scannerSym == Token.OPENBRACKET)
                 {
                     expr = Expression();
@@ -322,8 +323,67 @@ namespace ScannerParser
 
         private Result FuncCall()
         {
-            return null;
+            Result res = null;
+            List<Result> optionalArguments = null;
+            if (scannerSym == Token.CALL)
+            {
+                Next();
+                if (scannerSym == Token.IDENT)
+                {
+                    res = Ident();
+                    //Next(); // Taken care of by Ident
+                    if (scannerSym == Token.OPENPAREN)
+                    {
+                        Next();
+                        if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER)
+                        {
+                            optionalArguments = new List<Result>();
+                            optionalArguments.Add(Expression());
+                        }
+                        else
+                        {
+                            Next();
+                        }
+                        // TODO code that handles expression in parentheses or another function
+
+                        while (scannerSym == Token.COMMA)
+                        {
+                            if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER ||
+                                scannerSym == Token.OPENPAREN || scannerSym == Token.CALL)
+                            {
+                                Next();
+                                optionalArguments.Add(Expression());
+                            }
+                            else
+                            {
+                                scanner.Error("Ended up in optional arguments of function call and didn't parse a number, variable, comma, or expression");
+                            }
+                        }
+
+                        if (scannerSym == Token.CLOSEPAREN)
+                        {
+                            Next();
+                            // Combine ALL THE THINGS! -- I don't know how to do this, how does
+                            // passing arguments to function work in assembly?! BWAAAAHHHH!
+                        }
+                        else
+                        {
+                            scanner.Error("Ended up in arguments of function call and didn't parse a number, variable, comma, or expression");
+                        }
+                    }
+                }
+                else
+                {
+                    scanner.Error("Ended up at FuncCall but didn't parse an identifier");
+                }
+            }
+            else
+            {
+                scanner.Error("Ended up at FuncCall but didn't recieve the keyword call");
+            }
+            return res;
         }
+
         private Result Ident()
         {
             Result res = null;
@@ -339,13 +399,14 @@ namespace ScannerParser
             return res;
 
         }
+
         private Result Letter()
         {
             Result res;
             if (scannerSym == Token.IDENT)
             {
                 Next();
-                res = new Result(Kind.CONST, scanner.Id2String(scanner.id));
+                res = new Result(Kind.VAR, scanner.Id2String(scanner.id)); // changed to var for now to simulate output
 
             }
             else
@@ -358,6 +419,7 @@ namespace ScannerParser
 
 
         }
+
         private Result Digit()
         {
             Result res;
@@ -393,6 +455,23 @@ namespace ScannerParser
             finalResult.type = Kind.COND;
             finalResult.condition = Result.TokenToCondition(cond);
             return finalResult;
+        }
+
+        private void Assignment()
+        {
+            if (scannerSym == Token.LET)
+            {
+                Next();
+                Result res1 = Designator();
+                Next();
+                Result res2 = Expression();
+                sw.WriteLine("{0} {1} {2} {3}", "add", res1.regNo, res2.regNo, "R0");
+                Console.WriteLine("{0} {1} {2} {3}", "add", res1.regNo, res2.regNo, "R0");
+            }
+            else
+            {
+                scanner.Error("Ended up at Assignment but didn't encounter let keyword");
+            }
         }
 
         private Result Combine(Token opCode, Result A, Result B)
