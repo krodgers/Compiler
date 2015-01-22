@@ -34,12 +34,22 @@ namespace ScannerParser
             scanner = new Scanner(file);
             fs = File.Open(@"../../output.txt", FileMode.Create, FileAccess.ReadWrite);
             sw = new StreamWriter(fs);
+            Init();
+        }
+
+        // Sets initial state of parser
+        // for now
+        private void Init()
+        {
+            Next(); // set first symbol
         }
 
         ~Parser()
         {
-            sw.Close();
-            fs.Close();
+            if (sw != null)
+                sw.Close();
+            if (fs != null)
+                fs.Close();
         }
 
         private void Next()
@@ -185,9 +195,10 @@ namespace ScannerParser
                 res = Combine(opCode, res, res2);
             }
 
-            res.type = Kind.REG;
-            AllocateRegister();
-            res.regNo = currRegister;
+            // Handled in Combine
+            //res.type = Kind.REG;
+            //AllocateRegister();
+            //res.regNo = currRegister;
 
             return res;
         }
@@ -298,7 +309,7 @@ namespace ScannerParser
             return res;
         }
 
-        private int Number()
+        private double Number()
         {
             // TODO figure out if we need to have a function for number, but for now
             // it will return the last number seen
@@ -478,7 +489,7 @@ namespace ScannerParser
         {
             Result res = new Result();
             res.type = Kind.REG;
-            AllocateRegister();
+            AllocateRegister();// probably needs to change
             res.regNo = currRegister;
 
             if (A.type == Kind.VAR && B.type == Kind.VAR)

@@ -14,7 +14,7 @@ namespace ScannerParser
         private StreamReader input;
 
         private List<String> identifiers;
-        public int number; // the last nmber encountered
+        public double number; // the last nmber encountered
         public int id; // last identifier encountered
 
 
