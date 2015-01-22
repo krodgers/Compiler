@@ -56,10 +56,14 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="TokenTestFileAssign.txt" />
+    <Content Include="TokenTestFileComment.txt" />
+    <Content Include="TokenTestFileKeyWords.txt" />
+    <Content Include="TokenTestFilePunct.txt" />
+    <Content Include="TokenTestFileRelOP.txt" />
     <None Include="Resources\TokenTestFile.txt" />
     <Content Include="test001.txt" />
     <Content Include="TextExpression.txt" />
-    <Resource Include="TokenTestFile.txt" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Properties\Resources.resx">

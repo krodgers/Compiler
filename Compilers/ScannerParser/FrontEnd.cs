@@ -41,7 +41,7 @@ namespace ScannerParser
         public Token GetSym()
         {
             Token sym = ParseNextToken();
-            return 0;
+            return sym;
         }
 
         private Token ParseNextToken()
@@ -241,6 +241,7 @@ namespace ScannerParser
             if (idx == -1)
             {
                 identifiers.Add(newIdent);
+                id++;
             }
         }
 
