@@ -5,8 +5,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ScannerParser {
-    public enum Token {
+namespace ScannerParser
+{
+    public enum Token
+    {
         ERROR = 0, TIMES = 1, DIV = 2,
         PLUS = 11, MINUS = 12, EQL = 20,
         NEQ, LSS, GEQ, LEQ, GTR,
@@ -19,26 +21,37 @@ namespace ScannerParser {
         BEGIN = 150, MAIN = 200, EOF = 255
     };
 
-    class Parser {
+    class Parser
+    {
         private Token scannerSym; // current token on input
         private Scanner scanner;
         private FileStream fs; //debug
         private StreamWriter sw;
         private int currRegister;
 
-        public Parser(String file) {
+        public Parser(String file)
+        {
             scanner = new Scanner(file);
-            fs = File.Open(@"C:\Users\kevin\CS241_Compiler\assembly.txt", FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            fs = File.Open(@"../../output.txt", FileMode.OpenOrCreate, FileAccess.ReadWrite);
             sw = new StreamWriter(fs);
         }
 
-        private void Next() {
-            scannerSym = scanner.GetSym();
-            HandleToken();
+        public ~Parser()
+        {
+            sw.Close();
+            fs.Close();
         }
 
-        private void HandleToken() {
-            switch (scannerSym) {
+        private void Next()
+        {
+            scannerSym = scanner.GetSym();
+            //HandleToken(); TODO this needs to be moved somewhere else because causes problems in next
+        }
+
+        private void HandleToken()
+        {
+            switch (scannerSym)
+            {
                 #region Symbol Case Statements
                 case Token.ERROR:
                     Error();
@@ -123,7 +136,8 @@ namespace ScannerParser {
             }
         }
 
-        private void Error() {
+        private void Error()
+        {
             string msg;
             msg = string.Format("Unexpected {0} {1}, syntax error", scannerSym.ToString(), scanner.Id2String(scanner.id));
             scanner.Error(msg);
@@ -157,13 +171,15 @@ namespace ScannerParser {
         //    return ":D";
         //}
 
-        private Result Expression() {
+        private Result Expression()
+        {
             Result res;
             Result res2;
             Token opCode;
             res = Term();
             Next(); // TODO:: This here?
-            while (scannerSym == Token.PLUS || scannerSym == Token.MINUS) {
+            while (scannerSym == Token.PLUS || scannerSym == Token.MINUS)
+            {
                 opCode = scannerSym == Token.PLUS ? Token.PLUS : Token.MINUS;
                 Next();
                 res2 = Term();
@@ -176,48 +192,63 @@ namespace ScannerParser {
 
             return res;
         }
-        private Result Term() {
+        private Result Term()
+        {
             Result res = null, resB = null;
-            if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER) {
+            if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER)
+            {
                 res = Factor(); // will end on next token
-                while (scannerSym == Token.TIMES || scannerSym == Token.DIV) {
+                while (scannerSym == Token.TIMES || scannerSym == Token.DIV)
+                {
+                    Token tmp = scannerSym;
                     Next();
-                    if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER) {
+                    if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER)
+                    {
                         resB = Factor();
-                        res = Combine(scannerSym, res, resB);
+                        res = Combine(tmp, res, resB);
                     }
-                    else {
+                    else
+                    {
                         scanner.Error("Reached Term but don't have an Identifier or Number");
                     }
 
                 }
 
             }
-            else {
+            else
+            {
                 scanner.Error("Reached Term but don't have an Identifier or Number");
             }
             return res;
         }
-        private Result Factor() {
+        private Result Factor()
+        {
             Result res = null;
-            if (scannerSym == Token.IDENT) {
+            if (scannerSym == Token.IDENT)
+            {
                 res = Designator();
             }
-            else if (scannerSym == Token.NUMBER) {
-                res = Number();
+            else if (scannerSym == Token.NUMBER)
+            {
+                res = new Result(Kind.CONST, (double)Number());
 
             }
-            else if (scannerSym == Token.FUNC) {
+            else if (scannerSym == Token.FUNC)
+            {
                 // TODO:: Function things
                 res = new Result();
             }
-            else if (scannerSym == Token.OPENPAREN) {
+            else if (scannerSym == Token.OPENPAREN)
+            {
                 Next();
                 res = Expression();
-                if (scannerSym == Token.CLOSEPAREN) {
+                if (scannerSym == Token.CLOSEPAREN)
+                {
                     Next();
                 }
-                else {
+                else
+                {
+                    sw.WriteLine("Load {0}[{1}] R{2}", res.valueS, res.valueD, currRegister);
                     Console.WriteLine("Load {0}[{1}] R{2}", res.valueS, res.valueD, currRegister);
                     res = new Result(Kind.REG, currRegister); // TODO:: Or a variable?
                 }
@@ -225,80 +256,100 @@ namespace ScannerParser {
             }
             return res;
         }
-        private Result Designator() {
+        private Result Designator()
+        {
             Result res, expr;
-            if (scannerSym == Token.IDENT) {
+            if (scannerSym == Token.IDENT)
+            {
                 res = Ident();
                 Next();
-                if (scannerSym == Token.OPENBRACKET) {
+                if (scannerSym == Token.OPENBRACKET)
+                {
                     expr = Expression();
                     Next();
-                    if (scannerSym == Token.CLOSEBRACKET) {
+                    if (scannerSym == Token.CLOSEBRACKET)
+                    {
                         Next();
                         AllocateRegister();
+                        sw.WriteLine("Load {0}[{1}] R{2}", res.valueS, expr.valueD, currRegister);
                         Console.WriteLine("Load {0}[{1}] R{2}", res.valueS, expr.valueD, currRegister);
                         res = new Result(Kind.REG, currRegister); // TODO:: Or a variable?
 
                     }
-                    else {
+                    else
+                    {
                         scanner.Error("Designator: Unmatched [.... missing ]");
                         res = new Result(); // this is unreachable;
                     }
 
                 }
-                else {
+                else
+                {
                     // returning an identifier
                 }
 
             }
-            else {
+            else
+            {
                 scanner.Error("Ended up at Designator but didn't parse an identifier");
                 res = new Result(); // this is unreachable;
             }
             return res;
         }
 
-        private Result Number() {
-            Result res = null;
-            if (scannerSym == Token.NUMBER) {
-                Next();
-                res = Digit();
+        private int Number()
+        {
+            // TODO figure out if we need to have a function for number, but for now
+            // it will return the last number seen
 
-            }
-            else {
-                scanner.Error("Ended up at Identifier but didn't parse an identifier");
-                res = new Result(); // this is unreachable;
+            //Result res = null;
+            //if (scannerSym == Token.NUMBER)
+            //{
+            //    Next();
+            //    res = Digit();
 
-            }
-            return res;
+            //}
+            //else
+            //{
+            //    scanner.Error("Ended up at Identifier but didn't parse an identifier");
+            //    res = new Result(); // this is unreachable;
+
+            //}
+            Next();
+            return scanner.number;
         }
 
 
-        private Result FuncCall() {
+        private Result FuncCall()
+        {
             return null;
         }
-        private Result Ident() {
+        private Result Ident()
+        {
             Result res = null;
-            if (scannerSym == Token.IDENT) {
+            if (scannerSym == Token.IDENT)
+            {
                 res = Letter();
-                Next();
-
             }
-            else {
+            else
+            {
                 scanner.Error("Ended up at Identifier but didn't parse an identifier");
                 res = new Result(); // this is unreachable;
             }
             return res;
 
         }
-        private Result Letter() {
+        private Result Letter()
+        {
             Result res;
-            if (scannerSym == Token.IDENT) {
+            if (scannerSym == Token.IDENT)
+            {
                 Next();
                 res = new Result(Kind.CONST, scanner.Id2String(scanner.id));
 
             }
-            else {
+            else
+            {
                 scanner.Error("Ended up at Letter but didn't parse an identifier");
                 res = new Result(); // this is unreachable;
             }
@@ -307,14 +358,17 @@ namespace ScannerParser {
 
 
         }
-        private Result Digit() {
+        private Result Digit()
+        {
             Result res;
-            if (scannerSym == Token.NUMBER) {
+            if (scannerSym == Token.NUMBER)
+            {
                 Next();
                 res = new Result(Kind.CONST, scanner.number);
 
             }
-            else {
+            else
+            {
                 scanner.Error("Ended up at Digit but didn't parse a Number");
                 res = new Result(); // this is unreachable;
             }
@@ -341,48 +395,79 @@ namespace ScannerParser {
             return finalResult;
         }
 
-        private Result Combine(Token opCode, Result A, Result B) {
+        private Result Combine(Token opCode, Result A, Result B)
+        {
             Result res = new Result();
             res.type = Kind.REG;
             AllocateRegister();
             res.regNo = currRegister;
 
-            if (A.type == Kind.VAR && B.type == Kind.VAR) {
+            if (A.type == Kind.VAR && B.type == Kind.VAR)
+            {
                 Result loadedA = LoadVariable(A);
                 Result loadedB = LoadVariable(B);
                 PutF2(TokenToInstruction(opCode), loadedA, loadedB);
             }
-            else if (A.type == Kind.VAR && B.type == Kind.CONST) {
+            else if (A.type == Kind.VAR && B.type == Kind.CONST)
+            {
                 Result loadedA = LoadVariable(A);
                 PutF1(TokenToInstruction(opCode) + "i", loadedA, B);
 
             }
-            else if (A.type == Kind.VAR && B.type == Kind.REG) {
+            else if (A.type == Kind.VAR && B.type == Kind.REG)
+            {
                 Result loadedA = LoadVariable(A);
                 PutF2(TokenToInstruction(opCode), loadedA, B);
 
             }
-            else if (B.type == Kind.VAR && A.type == Kind.VAR) {
+            else if (B.type == Kind.VAR && A.type == Kind.VAR)
+            {
                 Result loadedB = LoadVariable(B);
                 Result loadedA = LoadVariable(A);
                 PutF2(TokenToInstruction(opCode), loadedB, loadedA);
             }
-            else if (B.type == Kind.VAR && A.type == Kind.CONST) {
+            else if (B.type == Kind.VAR && A.type == Kind.CONST)
+            {
                 Result loadedB = LoadVariable(B);
                 PutF1(TokenToInstruction(opCode) + "i", loadedB, A);
 
             }
-            else if (B.type == Kind.VAR && A.type == Kind.REG) {
+            else if (B.type == Kind.VAR && A.type == Kind.REG)
+            {
                 Result loadedB = LoadVariable(B);
                 PutF2(TokenToInstruction(opCode), loadedB, A);
 
+            }
+            // This case causes issues with register allocation as it
+            // is possibly not needed for constants
+            else if (A.type == Kind.CONST && B.type == Kind.CONST)
+            {
+                switch (opCode)
+                {
+                    case Token.TIMES:
+                        res.valueD = (double)(A.valueD * B.valueD);
+                        break;
+                    case Token.DIV:
+                        res.valueD = (double)(A.valueD / B.valueD);
+                        break;
+                    case Token.PLUS:
+                        res.valueD = (double)(A.valueD + B.valueD);
+                        break;
+                    case Token.MINUS:
+                        res.valueD = (double)(A.valueD - B.valueD);
+                        break;
+                }
+
+                res.type = Kind.CONST;
             }
 
             return res;
         }
 
-        private Result LoadVariable(Result r) {
+        private Result LoadVariable(Result r)
+        {
             AllocateRegister();
+            sw.WriteLine("load R{1} {0}", r.valueS, currRegister);
             Console.WriteLine("load R{1} {0}", r.valueS, currRegister);
             Result res = new Result();
             res.regNo = currRegister;
@@ -390,30 +475,36 @@ namespace ScannerParser {
             return res;
         }
 
-        private void PutF2(string opString, Result a, Result b) {
-          
+        private void PutF2(string opString, Result a, Result b)
+        {
+            sw.WriteLine("{0} {1} {2} {3}", opString, currRegister, a.regNo, b.regNo);
             Console.WriteLine("{0} {1} {2} {3}", opString, currRegister, a.regNo, b.regNo);
         }
 
 
-// Creates a F1 instruction
-// Result b should be the Constant
-        private void PutF1(string op, Result a, Result b) {
+        // Creates a F1 instruction
+        // Result b should be the Constant
+        private void PutF1(string op, Result a, Result b)
+        {
+            sw.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.valueD);
+            Console.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.valueD);
 
-          Console.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.valueD);
-       
 
         }
-        private void AllocateRegister() {
+        private void AllocateRegister()
+        {
             currRegister++;
         }
-        private void DeallocateRegister() {
+        private void DeallocateRegister()
+        {
             currRegister--;
         }
 
-        private string TokenToInstruction(Token t) {
+        private string TokenToInstruction(Token t)
+        {
             string opString;
-            switch (t) {
+            switch (t)
+            {
                 case Token.TIMES:
                     opString = "mul";
                     break;
