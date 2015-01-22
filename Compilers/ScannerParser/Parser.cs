@@ -21,7 +21,7 @@ namespace ScannerParser
         BEGIN = 150, MAIN = 200, EOF = 255
     };
 
-    class Parser
+    public class Parser
     {
         private Token scannerSym; // current token on input
         private Scanner scanner;
@@ -36,7 +36,7 @@ namespace ScannerParser
             sw = new StreamWriter(fs);
         }
 
-        public ~Parser()
+        ~Parser()
         {
             sw.Close();
             fs.Close();
