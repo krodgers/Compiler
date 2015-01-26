@@ -359,10 +359,10 @@ namespace ScannerParser
 
                         while (scannerSym == Token.COMMA)
                         {
+                            Next();
                             if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER ||
                                 scannerSym == Token.OPENPAREN || scannerSym == Token.CALL)
                             {
-                                Next();
                                 optionalArguments.Add(Expression());
                             }
                             else
@@ -391,6 +391,27 @@ namespace ScannerParser
             else
             {
                 scanner.Error("Ended up at FuncCall but didn't recieve the keyword call");
+            }
+            return res;
+        }
+
+        private Result IfStatement()
+        {
+            Result res = null;
+            if (scannerSym == Token.IF)
+            {
+                Next();
+                if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER
+                    || scannerSym == Token.OPENPAREN || scannerSym == Token.CALL)
+                {
+                    res = Relation();
+
+                }
+
+            }
+            else
+            {
+                scanner.Error("Ended up at If Statement but didn't parse the if keyword");
             }
             return res;
         }
@@ -457,11 +478,9 @@ namespace ScannerParser
             Result finalResult = null; ;
 
             res1 = Expression();
-            Next();
             Token cond = scannerSym;
             Next();
             res2 = Expression();
-            Next();
             finalResult = Combine(cond, res1, res2);
             finalResult.type = Kind.COND;
             finalResult.condition = Result.TokenToCondition(cond);
