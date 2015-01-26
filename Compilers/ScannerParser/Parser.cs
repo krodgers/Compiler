@@ -554,6 +554,26 @@ namespace ScannerParser
             return res;
         }
 
+        private void Main(){
+            if(VerifyToken(Token.MAIN, "Missing Main Function"))
+            {
+                if(scannerSym == Token.VAR | scannerSym == Token.ARR){
+                    VarDecl();
+                } else if(scannerSym == Token.FUNC || scannerSym == Token.PROC){
+                    FuncDecl();
+                }
+                if(VerifyToken(Token.OPENBRACKET, "Missing Opening bracket of program"){
+                StatSequence();
+                }
+				if(VerifyToken(Token.CLOSEBRACKET, "Missing closing bracket of program")){
+                    Next();
+                    if(VerifyToken(Token.PERIOD, "Unexpected end of program - missing period")){
+                        sw.WriteLine("RET 0");
+                    }
+                }
+
+        }
+
         private Result LoadVariable(Result r)
         {
             AllocateRegister();
@@ -621,6 +641,14 @@ namespace ScannerParser
 
             }
             return opString;
+        }
+
+        // Checks if scannerSym == t
+        // if not, pushes errMsg to Scanner and exits
+        private bool VerifyToken(Token t, string errMsg){
+            if(scannerSym != t)
+				scanner.Error(errMsg); // will exit program
+            return true;
         }
 
 
