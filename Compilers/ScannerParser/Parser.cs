@@ -239,54 +239,31 @@ namespace ScannerParser {
         }
 
         private Result Designator() {
-            Result res, expr;
-            if (scannerSym == Token.IDENT) {
-                res = Ident();
-                if (scannerSym == Token.OPENBRACKET) {
-                    expr = Expression();
-                    Next();
-                    if (scannerSym == Token.CLOSEBRACKET) {
-                        Next();
-                        AllocateRegister();
-                        sw.WriteLine("Load {0}[{1}] R{2}", res.valueS, expr.valueD, currRegister);
-                        Console.WriteLine("Load {0}[{1}] R{2}", res.valueS, expr.valueD, currRegister);
-                        res = new Result(Kind.REG, currRegister); // TODO:: Or a variable?
-
-                    } else {
-                        scanner.Error("Designator: Unmatched [.... missing ]");
-                        res = new Result(); // this is unreachable;
-                    }
-
-                } else {
-                    // returning an identifier
-                }
-
-            } else {
-                scanner.Error("Ended up at Designator but didn't parse an identifier");
-                res = new Result(); // this is unreachable;
+            Result res = null, expr = null;
+            VerifyToken(Token.IDENT, "Ended up at Designator but didn't parse an identifier");
+            res = Ident();
+            if (scannerSym == Token.OPENBRACKET) {
+                expr = Expression();
+                Next();
+                VerifyToken(Token.CLOSEBRACKET, "Designator: Unmatched [.... missing ]");
+                Next();
+                AllocateRegister();
+                sw.WriteLine("Load {0}[{1}] R{2}", res.valueS, expr.valueD, currRegister);
+                Console.WriteLine("Load {0}[{1}] R{2}", res.valueS, expr.valueD, currRegister);
+                res = new Result(Kind.REG, currRegister); // TODO:: Or a variable?
             }
+
+
             return res;
         }
 
-        private double Number() {
-            // TODO figure out if we need to have a function for number, but for now
-            // it will return the last number seen
+        private Result Number() {
+            Result res = null;
+            VerifyToken(Token.NUMBER, "Ended up at Number but didn't parse a Number");
+            Next(); // eat the number
+            res = new Result(Kind.CONST, scanner.number);
 
-            //Result res = null;
-            //if (scannerSym == Token.NUMBER)
-            //{
-            //    Next();
-            //    res = Digit();
-
-            //}
-            //else
-            //{
-            //    scanner.Error("Ended up at Identifier but didn't parse an identifier");
-            //    res = new Result(); // this is unreachable;
-
-            //}
-            Next();
-            return scanner.number;
+            return res;
         }
 
 
@@ -354,32 +331,14 @@ namespace ScannerParser {
         private Result Ident() {
             Result res = null;
             VerifyToken(Token.IDENT, "Ended up at Identifier but didn't parse an identifier");
-            res = Letter();
-            return res;
-
-        }
-
-        private Result Letter() {
-            Result res;
-            VerifyToken(Token.IDENT, "Ended up at Letter but didn't parse an identifier");
             Next(); // eat the identifier
             res = new Result(Kind.VAR, scanner.Id2String(scanner.id)); // changed to var for now to simulate output
-
-
-            return res;
-
-
-        }
-
-        private Result Digit() {
-            Result res;
-            VerifyToken(Token.NUMBER, "Ended up at Digit but didn't parse a Number");
-            Next();
-            res = new Result(Kind.CONST, scanner.number);
-
             return res;
 
         }
+
+
+
 
         private Result Relation() {
             Result res1 = null;
@@ -464,50 +423,97 @@ namespace ScannerParser {
             return res;
         }
 
-        private void Main(){
-			if(VerifyToken(Token.MAIN, "Missing Main Function")) // find "main"
+        private void Main() {
+            if (VerifyToken(Token.MAIN, "Missing Main Function")) // find "main"
 			{
-				if(scannerSym == Token.VAR | scannerSym == Token.ARR){ // variable declarations
-					VarDecl();
-				} 
-                if(scannerSym == Token.FUNC || scannerSym == Token.PROC){// function declarations
-					FuncDecl();
-				}
+                while (scannerSym == Token.VAR | scannerSym == Token.ARR) { // variable declarations
+                    VarDecl();
+                }
+                while (scannerSym == Token.FUNC || scannerSym == Token.PROC) {// function declarations
+                    FuncDecl();
+                }
 
                 // start program
-				if(VerifyToken(Token.OPENBRACKET, "Missing Opening bracket of program")) {
-				StatSequence();
-				}
+                if (VerifyToken(Token.OPENBRACKET, "Missing Opening bracket of program")) {
+                    StatSequence();
+                }
                 // end program
-				if(VerifyToken(Token.CLOSEBRACKET, "Missing closing bracket of program")){
+				if (VerifyToken(Token.CLOSEBRACKET, "Missing closing bracket of program")) {
 					Next();
-					if(VerifyToken(Token.PERIOD, "Unexpected end of program - missing period")){
-						sw.WriteLine("RET 0");
-					}
-				
-				}
+					if (VerifyToken(Token.PERIOD, "Unexpected end of program - missing period")) {
+                        sw.WriteLine("RET 0");
+                    }
 
-		}
-	}
-        private void FuncDecl() { }
+                }
+
+            }
+        }
+
+
+        private void FuncDecl() {
+            if (scannerSym == Token.FUNC || scannerSym == Token.PROC) {
+                Next();
+            }
+            VerifyToken(Token.IDENT, "Function/Procedure declaration missing a name");
+            Ident();
+            if (scannerSym == Token.OPENPAREN) {
+                // Formal Parameter
+                if (scannerSym == Token.IDENT) {
+                    Ident();
+                    while (scannerSym == Token.COMMA) {
+                        Next();
+                        Ident();
+                    }                    
+                }
+                VerifyToken(Token.CLOSEPAREN, "Function Declaration missing a closing parenthesis");
+            }
+            VerifyToken(Token.SEMI, "Function Declaration missing a semicolon");
+            // Func Body
+            // Variable declarations
+            while (scannerSym == Token.VAR || scannerSym == Token.ARR) {
+                VarDecl();
+            }
+            VerifyToken(Token.OPENBRACKET, "Function body missing open bracket");
+            // function statements
+            StatSequence();
+            
+            VerifyToken(Token.CLOSEBRACKET, "Function Body missing closing bracket"); //end function body
+            VerifyToken(Token.SEMI, "Function declaration missing semicolon"); // end function declaration
+        }
+
+
         private Result StatSequence() { return null; }
+
+
         // TODO:: This would be the optimal place to create ID-->Variable Map
         private void VarDecl() {
             if (scannerSym == Token.VAR) {
                 Next(); // eat "var"
                 VerifyToken(Token.IDENT, "Variable declaration missing variable name");
-                Result res = Ident();
+                Next(); // eat the ident 
+
                 while (scannerSym == Token.COMMA) {
                     Next(); // eat the comma
-
+                    VerifyToken(Token.IDENT, "Dangling comma in variable declaration");
+                    Next(); // eat the ident
 
                 }
 
             }
             if (scannerSym == Token.ARR) {
+                Next(); // eat  "array"
+                do {
+                    VerifyToken(Token.OPENBRACKET, "Array declaration missing [");
+                    Next(); // eat [
+                    Number();
+                    VerifyToken(Token.CLOSEBRACKET, "Array declaraion missing ]");
+                } while (scannerSym != Token.SEMI);
+
 
             }
 
+            VerifyToken(Token.SEMI, "Missing semicolon at end of variable declaration");
+            Next(); // eat semicolon
 
         }
 
@@ -530,8 +536,17 @@ namespace ScannerParser {
         // Creates a F1 instruction
         // Result b should be the Constant
         private void PutF1(string op, Result a, Result b) {
-            sw.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.valueD);
-            Console.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.valueD);
+
+            if (b.type == Kind.CONST) {
+                sw.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.valueD);
+                Console.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.valueD);
+
+            } else {
+                Console.WriteLine("PutF1 paramters in wrong order.");
+                sw.WriteLine("{0} {1} {2} {3}", op, currRegister, b.regNo, a.valueD);
+                Console.WriteLine("{0} {1} {2} {3}", op, currRegister, b.regNo, a.valueD);
+
+            }
 
 
         }
