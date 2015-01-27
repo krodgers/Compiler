@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 
 namespace ScannerParser
 {
+
+    // TODO:  Make scanner keep track of line numbers
     public class Scanner
     {
         // current character on input

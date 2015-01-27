@@ -354,7 +354,7 @@ namespace ScannerParser {
             finalResult.condition = Result.TokenToCondition(cond);
             return finalResult;
         }
-
+        // TODO:: Should this return a result?  Like which register the assignment has been loaded into??
         private void Assignment() {
             if (scannerSym == Token.LET) {
                 Next();
@@ -482,7 +482,61 @@ namespace ScannerParser {
         }
 
 
-        private Result StatSequence() { return null; }
+        private void StatSequence() {
+            Statement();
+            while (scannerSym == Token.SEMI) {
+                Next(); // eat Semicolon
+                Statement();
+            }
+        }
+
+        private Result Statement() {
+            Result res = null;
+            switch (scannerSym) {
+                case Token.LET:
+                    Assignment();
+                    break;
+                case Token.CALL:
+                    res = FuncCall();
+                    break;
+                case Token.IF:
+                    res = IfStatement();
+                    break;
+                case Token.WHILE:
+                    res = WhileStatement();
+                    break;
+                case Token.RETURN:
+                    res = ReturnStatement();
+                    break;
+                default:
+                    scanner.Error("Expected a statement of some sorts.");
+                    break;
+            }
+
+            return res;
+        }
+
+        private Result WhileStatement() {
+
+            return null;
+
+        }
+
+        private Result ReturnStatement() {
+            VerifyToken(Token.RETURN, "Missing return keyword");
+            Result res = null;
+            if (scannerSym == Token.IDENT) {
+                res = Expression();
+            }
+
+            // TODO: How does function know where to return to?
+            // pop stack?
+            // restore frames?
+            // load return value into return register?
+            sw.WriteLine("RET ??");
+            return null;
+        }
+
 
 
         // TODO:: This would be the optimal place to create ID-->Variable Map
