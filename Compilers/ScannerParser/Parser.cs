@@ -1,5 +1,6 @@
 ﻿﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -56,6 +57,11 @@ namespace ScannerParser
         {
             scannerSym = scanner.GetSym();
             //HandleToken(); TODO this needs to be moved somewhere else because causes problems in next
+        }
+
+        public void StartFirstPass()
+        {
+            Main();
         }
 
         private void HandleToken()
@@ -720,33 +726,17 @@ namespace ScannerParser
 
         }
 
-        public void Computation()
+        private void OutputNum(Result r)
         {
-            VerifyToken(Token.MAIN, "The program did not start with the main keyword");
-            Next(); // eat main token
-            while (scannerSym == Token.VAR || scannerSym == Token.ARR ||
-                scannerSym == Token.FUNC || scannerSym == Token.PROC)
+            // todo, implement outputNum, but we need way of knowing that it needs to be called
+            if (r.type == Kind.REG)
             {
-                if (scannerSym == Token.VAR || scannerSym == Token.ARR)
-                {
-                    VarDecl();
-                }
-                else if (scannerSym == Token.FUNC || scannerSym == Token.PROC)
-                {
-                    FuncDecl();
-                }
-                else
-                {
-                    scanner.Error("This should never happen");
-                }
+
             }
-            VerifyToken(Token.BEGIN, "Missing opening curly brace for Main");
-            Next();
-            StatSequence();
-            VerifyToken(Token.END, "Missing closing curly brace for Main");
-            Next();
-            VerifyToken(Token.PERIOD, "Missing final period at end of program");
-            Next();
+            else
+            {
+                Debug.WriteLine("OutputNum was not provided with a register as an argument, this is a parser error");
+            }
         }
 
 
