@@ -382,7 +382,7 @@ namespace ScannerParser
                         }
                         else
                         {
-                            Scanner.Error("The relation in the if did not contain a valid conditional operator");
+                            scanner.Error("The relation in the if did not contain a valid conditional operator");
                         }
                         Next();
                         StatSequence();
@@ -398,7 +398,7 @@ namespace ScannerParser
                         }
                         else
                         {
-                            Scanner.Error("In the if statement and found no token that matches either an else or a then");
+                            scanner.Error("In the if statement and found no token that matches either an else or a then");
                         }
                     }
 
@@ -639,8 +639,28 @@ namespace ScannerParser
 
         private Result WhileStatement()
         {
+            // todo, with the while statement and the if statements, fixuploc and such need
+            // to be implemented
 
-            return null;
+            VerifyToken(Token.WHILE, "Got to while statement without seeing the while keyword");
+            Next(); // eat while
+            Result res = Relation();
+            VerifyToken(Token.WHILE, "No do keyword after the relation in while statement");
+            Next(); // eat do
+            if (res.condition != CondOp.ERR)
+            {
+                string negatedTokenString = TokenToInstruction(NegatedConditional(res.condition));
+                PutF1(negatedTokenString, res, new Result(Kind.CONST, "offset"));
+                StatSequence();
+                // todo, here we will need a branch to loop header
+                VerifyToken(Token.OD, "The while loop was not properly closed with the od keyword");
+                Next(); //eat od
+            }
+            else
+            {
+                scanner.Error("The relation in the if did not contain a valid conditional operator");
+            }
+            return new Result(); // todo, don't know what this should be either
 
         }
 
@@ -699,6 +719,36 @@ namespace ScannerParser
             Next(); // eat semicolon
 
         }
+
+        public void Computation()
+        {
+            VerifyToken(Token.MAIN, "The program did not start with the main keyword");
+            Next(); // eat main token
+            while (scannerSym == Token.VAR || scannerSym == Token.ARR ||
+                scannerSym == Token.FUNC || scannerSym == Token.PROC)
+            {
+                if (scannerSym == Token.VAR || scannerSym == Token.ARR)
+                {
+                    VarDecl();
+                }
+                else if (scannerSym == Token.FUNC || scannerSym == Token.PROC)
+                {
+                    FuncDecl();
+                }
+                else
+                {
+                    scanner.Error("This should never happen");
+                }
+            }
+            VerifyToken(Token.BEGIN, "Missing opening curly brace for Main");
+            Next();
+            StatSequence();
+            VerifyToken(Token.END, "Missing closing curly brace for Main");
+            Next();
+            VerifyToken(Token.PERIOD, "Missing final period at end of program");
+            Next();
+        }
+
 
         private void ConditionalJumpForward(Result x)
         {
