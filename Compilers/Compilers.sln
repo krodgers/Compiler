@@ -5,6 +5,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScannerParser", "ScannerPar
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScannerParserTest", "ScannerParserTest\ScannerParserTest.csproj", "{971B4072-17BC-4B94-AA10-104C7657E9A0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ParserTests", "ParserTests\ParserTests.csproj", "{AA0AB03B-4D6D-4F39-B53C-82B44DC59600}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -19,6 +21,10 @@ Global
 		{971B4072-17BC-4B94-AA10-104C7657E9A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{971B4072-17BC-4B94-AA10-104C7657E9A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{971B4072-17BC-4B94-AA10-104C7657E9A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AA0AB03B-4D6D-4F39-B53C-82B44DC59600}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AA0AB03B-4D6D-4F39-B53C-82B44DC59600}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AA0AB03B-4D6D-4F39-B53C-82B44DC59600}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AA0AB03B-4D6D-4F39-B53C-82B44DC59600}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

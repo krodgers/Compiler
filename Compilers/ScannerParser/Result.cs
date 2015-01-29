@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace ScannerParser {
     public enum Kind { VAR, COND, REG, CONST };
-    public enum CondOp { GT, LT, LEQ, GEQ, EQ, NEQ, ERR };
+    public enum CondOp { GT, LT, LEQ, GEQ, EQ, NEQ, ERR, NONE };
     class Result {
         public Kind type;
         public int regNo;
-        public CondOp condition; // the condition operator, if this is a condition
+        public CondOp? condition; // the condition operator, if this is a condition
         public int fixUpLoc;
         public double valueD; // value of constant
         public string valueS; // value of constant or the variable name

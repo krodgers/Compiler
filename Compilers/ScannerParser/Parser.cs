@@ -5,8 +5,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace ScannerParser {
-    public enum Token {
+namespace ScannerParser
+{
+    public enum Token
+    {
         ERROR = 0, TIMES = 1, DIV = 2,
         PLUS = 11, MINUS = 12, EQL = 20,
         NEQ, LSS, GEQ, LEQ, GTR,
@@ -19,14 +21,16 @@ namespace ScannerParser {
         BEGIN = 150, MAIN = 200, EOF = 255
     };
 
-    public class Parser {
+    public class Parser
+    {
         private Token scannerSym; // current token on input
         private Scanner scanner;
         private FileStream fs; //debug
         private StreamWriter sw;
         private int currRegister;
 
-        public Parser(String file) {
+        public Parser(String file)
+        {
             scanner = new Scanner(file);
             fs = File.Open(@"../../output.txt", FileMode.Create, FileAccess.ReadWrite);
             sw = new StreamWriter(fs);
@@ -35,24 +39,29 @@ namespace ScannerParser {
 
         // Sets initial state of parser
         // for now
-        private void Init() {
+        private void Init()
+        {
             Next(); // set first symbol
         }
 
-        ~Parser() {
+        ~Parser()
+        {
             if (sw != null)
                 sw.Close();
             if (fs != null)
                 fs.Close();
         }
 
-        private void Next() {
+        private void Next()
+        {
             scannerSym = scanner.GetSym();
             //HandleToken(); TODO this needs to be moved somewhere else because causes problems in next
         }
 
-        private void HandleToken() {
-            switch (scannerSym) {
+        private void HandleToken()
+        {
+            switch (scannerSym)
+            {
                 #region Symbol Case Statements
                 case Token.ERROR:
                     Error();
@@ -137,7 +146,8 @@ namespace ScannerParser {
             }
         }
 
-        private void Error() {
+        private void Error()
+        {
             string msg;
             msg = string.Format("Unexpected {0} {1}, syntax error", scannerSym.ToString(), scanner.Id2String(scanner.id));
             scanner.Error(msg);
@@ -171,12 +181,14 @@ namespace ScannerParser {
         //    return ":D";
         //}
 
-        private Result Expression() {
+        private Result Expression()
+        {
             Result res;
             Result res2;
             Token opCode;
             res = Term();
-            while (scannerSym == Token.PLUS || scannerSym == Token.MINUS) {
+            while (scannerSym == Token.PLUS || scannerSym == Token.MINUS)
+            {
                 opCode = scannerSym == Token.PLUS ? Token.PLUS : Token.MINUS;
                 Next();
                 res2 = Term();
@@ -191,44 +203,63 @@ namespace ScannerParser {
             return res;
         }
 
-        private Result Term() {
+        private Result Term()
+        {
             Result res = null, resB = null;
-            if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER) {
+            if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER)
+            {
                 res = Factor(); // will end on next token
-                while (scannerSym == Token.TIMES || scannerSym == Token.DIV) {
+                while (scannerSym == Token.TIMES || scannerSym == Token.DIV)
+                {
                     Token tmp = scannerSym;
                     Next();
-                    if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER) {
+                    if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER)
+                    {
                         resB = Factor();
                         res = Combine(tmp, res, resB);
-                    } else {
+                    }
+                    else
+                    {
                         scanner.Error("Reached Term but don't have an Identifier or Number");
                     }
 
                 }
 
-            } else {
+            }
+            else
+            {
                 scanner.Error("Reached Term but don't have an Identifier or Number");
             }
             return res;
         }
 
-        private Result Factor() {
+        private Result Factor()
+        {
             Result res = null;
-            if (scannerSym == Token.IDENT) {
+            if (scannerSym == Token.IDENT)
+            {
                 res = Designator();
-            } else if (scannerSym == Token.NUMBER) {
+            }
+            else if (scannerSym == Token.NUMBER)
+            {
                 res = new Result(Kind.CONST, (double)Number());
 
-            } else if (scannerSym == Token.FUNC) {
+            }
+            else if (scannerSym == Token.FUNC)
+            {
                 // TODO:: Function things
                 res = new Result();
-            } else if (scannerSym == Token.OPENPAREN) {
+            }
+            else if (scannerSym == Token.OPENPAREN)
+            {
                 Next();
                 res = Expression();
-                if (scannerSym == Token.CLOSEPAREN) {
+                if (scannerSym == Token.CLOSEPAREN)
+                {
                     Next();
-                } else {
+                }
+                else
+                {
                     sw.WriteLine("Load {0}[{1}] R{2}", res.valueS, res.valueD, currRegister);
                     Console.WriteLine("Load {0}[{1}] R{2}", res.valueS, res.valueD, currRegister);
                     res = new Result(Kind.REG, currRegister); // TODO:: Or a variable?
@@ -267,68 +298,97 @@ namespace ScannerParser {
         }
 
 
-        private Result FuncCall() {
+        private Result FuncCall()
+        {
             Result res = null;
             List<Result> optionalArguments = null;
-            if (scannerSym == Token.CALL) {
+            if (scannerSym == Token.CALL)
+            {
                 Next();
-                if (scannerSym == Token.IDENT) {
+                if (scannerSym == Token.IDENT)
+                {
                     res = Ident();
                     //Next(); // Taken care of by Ident
-                    if (scannerSym == Token.OPENPAREN) {
+                    if (scannerSym == Token.OPENPAREN)
+                    {
                         Next();
-                        if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER) {
+                        if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER)
+                        {
                             optionalArguments = new List<Result>();
                             optionalArguments.Add(Expression());
-                        } else {
+                        }
+                        else
+                        {
                             Next();
                         }
                         // TODO code that handles expression in parentheses or another function
 
-                        while (scannerSym == Token.COMMA) {
+                        while (scannerSym == Token.COMMA)
+                        {
                             Next();
                             if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER ||
-                                scannerSym == Token.OPENPAREN || scannerSym == Token.CALL) {
+                                scannerSym == Token.OPENPAREN || scannerSym == Token.CALL)
+                            {
                                 optionalArguments.Add(Expression());
-                            } else {
+                            }
+                            else
+                            {
                                 scanner.Error("Ended up in optional arguments of function call and didn't parse a number, variable, comma, or expression");
                             }
                         }
 
-                        if (scannerSym == Token.CLOSEPAREN) {
+                        if (scannerSym == Token.CLOSEPAREN)
+                        {
                             Next();
                             // Combine ALL THE THINGS! -- I don't know how to do this, how does
                             // passing arguments to function work in assembly?! BWAAAAHHHH!
-                        } else {
+                        }
+                        else
+                        {
                             scanner.Error("Ended up in arguments of function call and didn't parse a number, variable, comma, or expression");
                         }
                     }
-                } else {
+                }
+                else
+                {
                     scanner.Error("Ended up at FuncCall but didn't parse an identifier");
                 }
-            } else {
+            }
+            else
+            {
                 scanner.Error("Ended up at FuncCall but didn't recieve the keyword call");
             }
             return res;
         }
 
-        private Result IfStatement() {
+        private Result IfStatement()
+        {
             Result res = null;
-            if (scannerSym == Token.IF) {
+            if (scannerSym == Token.IF)
+            {
                 Next();
                 if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER
-                    || scannerSym == Token.OPENPAREN || scannerSym == Token.CALL) {
+                    || scannerSym == Token.OPENPAREN || scannerSym == Token.CALL)
+                {
                     res = Relation();
+                    if (VerifyToken(Token.THEN, "The then keyword did not follow the relation in if statement"))
+                    {
+                        
+                    }
+
 
                 }
 
-            } else {
+            }
+            else
+            {
                 scanner.Error("Ended up at If Statement but didn't parse the if keyword");
             }
             return res;
         }
 
-        private Result Ident() {
+        private Result Ident()
+        {
             Result res = null;
             VerifyToken(Token.IDENT, "Ended up at Identifier but didn't parse an identifier");
             Next(); // eat the identifier
@@ -339,8 +399,8 @@ namespace ScannerParser {
 
 
 
-
-        private Result Relation() {
+        private Result Relation()
+        {
             Result res1 = null;
             Result res2 = null;
             Result finalResult = null; ;
@@ -355,54 +415,73 @@ namespace ScannerParser {
             return finalResult;
         }
         // TODO:: Should this return a result?  Like which register the assignment has been loaded into??
-        private void Assignment() {
-            if (scannerSym == Token.LET) {
+
+        private void Assignment()
+        {
+            if (scannerSym == Token.LET)
+            {
                 Next();
                 Result res1 = Designator();
                 Next();
                 Result res2 = Expression();
                 sw.WriteLine("{0} {1} {2} {3}", "add", res1.regNo, res2.regNo, "R0");
                 Console.WriteLine("{0} {1} {2} {3}", "add", res1.regNo, res2.regNo, "R0");
-            } else {
+            }
+            else
+            {
                 scanner.Error("Ended up at Assignment but didn't encounter let keyword");
             }
         }
 
-        private Result Combine(Token opCode, Result A, Result B) {
+        private Result Combine(Token opCode, Result A, Result B)
+        {
             Result res = new Result();
             res.type = Kind.REG;
             AllocateRegister();// probably needs to change
             res.regNo = currRegister;
 
-            if (A.type == Kind.VAR && B.type == Kind.VAR) {
+            if (A.type == Kind.VAR && B.type == Kind.VAR)
+            {
                 Result loadedA = LoadVariable(A);
                 Result loadedB = LoadVariable(B);
                 PutF2(TokenToInstruction(opCode), loadedA, loadedB);
-            } else if (A.type == Kind.VAR && B.type == Kind.CONST) {
+            }
+            else if (A.type == Kind.VAR && B.type == Kind.CONST)
+            {
                 Result loadedA = LoadVariable(A);
                 PutF1(TokenToInstruction(opCode) + "i", loadedA, B);
 
-            } else if (A.type == Kind.VAR && B.type == Kind.REG) {
+            }
+            else if (A.type == Kind.VAR && B.type == Kind.REG)
+            {
                 Result loadedA = LoadVariable(A);
                 PutF2(TokenToInstruction(opCode), loadedA, B);
 
-            } else if (B.type == Kind.VAR && A.type == Kind.VAR) {
+            }
+            else if (B.type == Kind.VAR && A.type == Kind.VAR)
+            {
                 Result loadedB = LoadVariable(B);
                 Result loadedA = LoadVariable(A);
                 PutF2(TokenToInstruction(opCode), loadedB, loadedA);
-            } else if (B.type == Kind.VAR && A.type == Kind.CONST) {
+            }
+            else if (B.type == Kind.VAR && A.type == Kind.CONST)
+            {
                 Result loadedB = LoadVariable(B);
                 PutF1(TokenToInstruction(opCode) + "i", loadedB, A);
 
-            } else if (B.type == Kind.VAR && A.type == Kind.REG) {
+            }
+            else if (B.type == Kind.VAR && A.type == Kind.REG)
+            {
                 Result loadedB = LoadVariable(B);
                 PutF2(TokenToInstruction(opCode), loadedB, A);
 
             }
-                // This case causes issues with register allocation as it
-                // is possibly not needed for constants
-              else if (A.type == Kind.CONST && B.type == Kind.CONST) {
-                switch (opCode) {
+            // This case causes issues with register allocation as it
+            // is possibly not needed for constants
+            else if (A.type == Kind.CONST && B.type == Kind.CONST)
+            {
+                switch (opCode)
+                {
                     case Token.TIMES:
                         res.valueD = (double)(A.valueD * B.valueD);
                         break;
@@ -540,8 +619,10 @@ namespace ScannerParser {
 
 
         // TODO:: This would be the optimal place to create ID-->Variable Map
-        private void VarDecl() {
-            if (scannerSym == Token.VAR) {
+        private void VarDecl()
+        {
+            if (scannerSym == Token.VAR)
+            {
                 Next(); // eat "var"
                 VerifyToken(Token.IDENT, "Variable declaration missing variable name");
                 Next(); // eat the ident 
@@ -571,7 +652,32 @@ namespace ScannerParser {
 
         }
 
-        private Result LoadVariable(Result r) {
+        private void ConditionalJumpForward(Result x)
+        {
+
+        }
+
+        private Token NegatedContidional(Token cond)
+        {
+            switch (cond)
+            {
+                case Token.EQL:
+                    return Token.NEQ;
+                case Token.NEQ:
+                    return Token.EQL;
+                case Token.LSS:
+                    return Token.GEQ;
+                case Token.GTR:
+                    return Token.LEQ;
+                case Token.LEQ:
+                    return Token.GTR;
+                case Token.GEQ:
+                    return Token.LSS;
+            }
+        }
+
+        private Result LoadVariable(Result r)
+        {
             AllocateRegister();
             sw.WriteLine("load R{1} {0}", r.valueS, currRegister);
             Console.WriteLine("load R{1} {0}", r.valueS, currRegister);
@@ -581,7 +687,8 @@ namespace ScannerParser {
             return res;
         }
 
-        private void PutF2(string opString, Result a, Result b) {
+        private void PutF2(string opString, Result a, Result b)
+        {
             sw.WriteLine("{0} {1} {2} {3}", opString, currRegister, a.regNo, b.regNo);
             Console.WriteLine("{0} {1} {2} {3}", opString, currRegister, a.regNo, b.regNo);
         }
@@ -604,16 +711,20 @@ namespace ScannerParser {
 
 
         }
-        private void AllocateRegister() {
+        private void AllocateRegister()
+        {
             currRegister++;
         }
-        private void DeallocateRegister() {
+        private void DeallocateRegister()
+        {
             currRegister--;
         }
 
-        private string TokenToInstruction(Token t) {
+        private string TokenToInstruction(Token t)
+        {
             string opString;
-            switch (t) {
+            switch (t)
+            {
                 case Token.TIMES:
                     opString = "mul";
                     break;
@@ -644,7 +755,8 @@ namespace ScannerParser {
 
         // Checks if scannerSym == t
         // if not, pushes errMsg to Scanner and exits
-        private bool VerifyToken(Token t, string errMsg) {
+        private bool VerifyToken(Token t, string errMsg)
+        {
             if (scannerSym != t)
                 scanner.Error(errMsg); // will exit program
             return true;
