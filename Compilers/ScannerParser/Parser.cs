@@ -269,11 +269,13 @@ namespace ScannerParser
             return res;
         }
 
-        private Result Designator() {
+        private Result Designator()
+        {
             Result res = null, expr = null;
             VerifyToken(Token.IDENT, "Ended up at Designator but didn't parse an identifier");
             res = Ident();
-            if (scannerSym == Token.OPENBRACKET) {
+            if (scannerSym == Token.OPENBRACKET)
+            {
                 expr = Expression();
                 Next();
                 VerifyToken(Token.CLOSEBRACKET, "Designator: Unmatched [.... missing ]");
@@ -288,7 +290,7 @@ namespace ScannerParser
             return res;
         }
 
-        private Result Number()
+        private Result Number() {
             Result res = null;
             VerifyToken(Token.NUMBER, "Ended up at Number but didn't parse a Number");
             Next(); // eat the number
@@ -373,7 +375,31 @@ namespace ScannerParser
                     res = Relation();
                     if (VerifyToken(Token.THEN, "The then keyword did not follow the relation in if statement"))
                     {
-                        
+                        if (res.condition != CondOp.ERR)
+                        {
+                            string negatedTokenString = TokenToInstruction(NegatedConditional(res.condition));
+                            PutF1(negatedTokenString, res, new Result(Kind.CONST, "offset"));
+                        }
+                        else
+                        {
+                            Scanner.Error("The relation in the if did not contain a valid conditional operator");
+                        }
+                        Next();
+                        StatSequence();
+
+                        if (scannerSym == Token.ELSE)
+                        {
+                            Next();
+                            StatSequence();
+                        }
+                        else if (scannerSym == Token.FI)
+                        {
+                            Next();
+                        }
+                        else
+                        {
+                            Scanner.Error("In the if statement and found no token that matches either an else or a then");
+                        }
                     }
 
 
@@ -384,7 +410,7 @@ namespace ScannerParser
             {
                 scanner.Error("Ended up at If Statement but didn't parse the if keyword");
             }
-            return res;
+            return new Result(); // todo, I don't have any idea what should be in this result, or if it's even needed
         }
 
         private Result Ident()
@@ -502,24 +528,30 @@ namespace ScannerParser
             return res;
         }
 
-        private void Main() {
+        private void Main()
+        {
             if (VerifyToken(Token.MAIN, "Missing Main Function")) // find "main"
-			{
-                while (scannerSym == Token.VAR | scannerSym == Token.ARR) { // variable declarations
+            {
+                while (scannerSym == Token.VAR | scannerSym == Token.ARR)
+                { // variable declarations
                     VarDecl();
                 }
-                while (scannerSym == Token.FUNC || scannerSym == Token.PROC) {// function declarations
+                while (scannerSym == Token.FUNC || scannerSym == Token.PROC)
+                {// function declarations
                     FuncDecl();
                 }
 
                 // start program
-                if (VerifyToken(Token.OPENBRACKET, "Missing Opening bracket of program")) {
+                if (VerifyToken(Token.OPENBRACKET, "Missing Opening bracket of program"))
+                {
                     StatSequence();
                 }
                 // end program
-				if (VerifyToken(Token.CLOSEBRACKET, "Missing closing bracket of program")) {
-					Next();
-					if (VerifyToken(Token.PERIOD, "Unexpected end of program - missing period")) {
+                if (VerifyToken(Token.CLOSEBRACKET, "Missing closing bracket of program"))
+                {
+                    Next();
+                    if (VerifyToken(Token.PERIOD, "Unexpected end of program - missing period"))
+                    {
                         sw.WriteLine("RET 0");
                     }
 
@@ -529,49 +561,59 @@ namespace ScannerParser
         }
 
 
-        private void FuncDecl() {
-            if (scannerSym == Token.FUNC || scannerSym == Token.PROC) {
+        private void FuncDecl()
+        {
+            if (scannerSym == Token.FUNC || scannerSym == Token.PROC)
+            {
                 Next();
             }
             VerifyToken(Token.IDENT, "Function/Procedure declaration missing a name");
             Ident();
-            if (scannerSym == Token.OPENPAREN) {
+            if (scannerSym == Token.OPENPAREN)
+            {
                 // Formal Parameter
-                if (scannerSym == Token.IDENT) {
+                if (scannerSym == Token.IDENT)
+                {
                     Ident();
-                    while (scannerSym == Token.COMMA) {
+                    while (scannerSym == Token.COMMA)
+                    {
                         Next();
                         Ident();
-                    }                    
+                    }
                 }
                 VerifyToken(Token.CLOSEPAREN, "Function Declaration missing a closing parenthesis");
             }
             VerifyToken(Token.SEMI, "Function Declaration missing a semicolon");
             // Func Body
             // Variable declarations
-            while (scannerSym == Token.VAR || scannerSym == Token.ARR) {
+            while (scannerSym == Token.VAR || scannerSym == Token.ARR)
+            {
                 VarDecl();
             }
             VerifyToken(Token.OPENBRACKET, "Function body missing open bracket");
             // function statements
             StatSequence();
-            
+
             VerifyToken(Token.CLOSEBRACKET, "Function Body missing closing bracket"); //end function body
             VerifyToken(Token.SEMI, "Function declaration missing semicolon"); // end function declaration
         }
 
 
-        private void StatSequence() {
+        private void StatSequence()
+        {
             Statement();
-            while (scannerSym == Token.SEMI) {
+            while (scannerSym == Token.SEMI)
+            {
                 Next(); // eat Semicolon
                 Statement();
             }
         }
 
-        private Result Statement() {
+        private Result Statement()
+        {
             Result res = null;
-            switch (scannerSym) {
+            switch (scannerSym)
+            {
                 case Token.LET:
                     Assignment();
                     break;
@@ -595,16 +637,19 @@ namespace ScannerParser
             return res;
         }
 
-        private Result WhileStatement() {
+        private Result WhileStatement()
+        {
 
             return null;
 
         }
 
-        private Result ReturnStatement() {
+        private Result ReturnStatement()
+        {
             VerifyToken(Token.RETURN, "Missing return keyword");
             Result res = null;
-            if (scannerSym == Token.IDENT) {
+            if (scannerSym == Token.IDENT)
+            {
                 res = Expression();
             }
 
@@ -627,7 +672,8 @@ namespace ScannerParser
                 VerifyToken(Token.IDENT, "Variable declaration missing variable name");
                 Next(); // eat the ident 
 
-                while (scannerSym == Token.COMMA) {
+                while (scannerSym == Token.COMMA)
+                {
                     Next(); // eat the comma
                     VerifyToken(Token.IDENT, "Dangling comma in variable declaration");
                     Next(); // eat the ident
@@ -635,9 +681,11 @@ namespace ScannerParser
                 }
 
             }
-            if (scannerSym == Token.ARR) {
+            if (scannerSym == Token.ARR)
+            {
                 Next(); // eat  "array"
-                do {
+                do
+                {
                     VerifyToken(Token.OPENBRACKET, "Array declaration missing [");
                     Next(); // eat [
                     Number();
@@ -657,22 +705,25 @@ namespace ScannerParser
 
         }
 
-        private Token NegatedContidional(Token cond)
+        private Token NegatedConditional(CondOp? cond)
         {
+            // todo, do we even need CondOp? It seems redundant
             switch (cond)
             {
-                case Token.EQL:
+                case CondOp.EQ:
                     return Token.NEQ;
-                case Token.NEQ:
+                case CondOp.NEQ:
                     return Token.EQL;
-                case Token.LSS:
+                case CondOp.LT:
                     return Token.GEQ;
-                case Token.GTR:
+                case CondOp.GT:
                     return Token.LEQ;
-                case Token.LEQ:
+                case CondOp.LEQ:
                     return Token.GTR;
-                case Token.GEQ:
+                case CondOp.GEQ:
                     return Token.LSS;
+                default:
+                    return Token.ERROR;
             }
         }
 
@@ -696,13 +747,24 @@ namespace ScannerParser
 
         // Creates a F1 instruction
         // Result b should be the Constant
-        private void PutF1(string op, Result a, Result b) {
+        private void PutF1(string op, Result a, Result b)
+        {
 
-            if (b.type == Kind.CONST) {
+            if (b.type == Kind.CONST)
+            {
                 sw.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.valueD);
                 Console.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.valueD);
 
-            } else {
+            }
+            else if (a.type == Kind.COND)
+            {
+                // todo, the value for the second parameter shouldn't be a string
+                // it needs to be the offset, but don't know how to do that yet
+                sw.WriteLine("{0} {1} {2}", op, a.regNo, b.valueS);
+                Console.WriteLine("{0} {1} {2}", op, a.regNo, b.valueS);
+            }
+            else
+            {
                 Console.WriteLine("PutF1 paramters in wrong order.");
                 sw.WriteLine("{0} {1} {2} {3}", op, currRegister, b.regNo, a.valueD);
                 Console.WriteLine("{0} {1} {2} {3}", op, currRegister, b.regNo, a.valueD);
