@@ -8,15 +8,15 @@ using System.Threading.Tasks;
 namespace ScannerParser
 {
 
-    // TODO:  Make scanner keep track of line numbers
+    // TODO:: built  in function tokens?
     public class Scanner
     {
         // current character on input
         private char? inputSym; //nullable
         private StreamReader input;
         private List<String> identifiers;
-        
-        public int PC; // current line number
+
+        public int PC { get; private set; } // current line number
         public double number; // the last nmber encountered
         public int id; // last identifier encountered
 
@@ -69,6 +69,7 @@ namespace ScannerParser
                         if (input.Peek() == '/')
                         {
                             input.ReadLine(); // is a comment and the line should be skipped
+                            PC++; // count the comment line
                             inputSym = NextChar();
                             res = ParseNextToken();
                             return res;
@@ -177,7 +178,11 @@ namespace ScannerParser
             {
                 if (input.EndOfStream)
                     return null;
+                
                 curr = (char?)input.Read();
+                if (curr == '\n') {
+                    PC++;
+                }
 
             } while (char.IsWhiteSpace((char)curr));
 
@@ -239,6 +244,7 @@ namespace ScannerParser
         }
 
         // Add an identifier to the identifiers list
+        // Makes sure id refers to the last symbol seen
         private void AddIdent(String newIdent)
         {
             int idx = identifiers.IndexOf(newIdent);
@@ -246,6 +252,8 @@ namespace ScannerParser
             {
                 identifiers.Add(newIdent);
                 id++;
+            } else {
+                id = idx;
             }
         }
 
