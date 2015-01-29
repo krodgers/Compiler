@@ -69,7 +69,7 @@ namespace ScannerParser
                         if (input.Peek() == '/')
                         {
                             input.ReadLine(); // is a comment and the line should be skipped
-                            PC++; // count the comment line
+                            //PC++; // count the comment line
                             inputSym = NextChar();
                             res = ParseNextToken();
                             return res;
