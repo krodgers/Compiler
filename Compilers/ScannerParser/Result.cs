@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ScannerParser {
     public enum Kind { VAR, COND, REG, CONST };
-    public enum CondOp { GT, LT, LEQ, GEQ, EQ, NEQ, ERR, NONE };
+    public enum CondOp { GT, LT, LEQ, GEQ, EQ, NEQ, ERR };
     class Result {
         public Kind type;
         public int regNo;

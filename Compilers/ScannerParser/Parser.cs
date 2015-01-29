@@ -242,7 +242,7 @@ namespace ScannerParser
             }
             else if (scannerSym == Token.NUMBER)
             {
-                res = new Result(Kind.CONST, (double)Number());
+                res = new Result(Kind.CONST, Number().valueD);
 
             }
             else if (scannerSym == Token.FUNC)
@@ -288,7 +288,7 @@ namespace ScannerParser
             return res;
         }
 
-        private Result Number() {
+        private Result Number()
             Result res = null;
             VerifyToken(Token.NUMBER, "Ended up at Number but didn't parse a Number");
             Next(); // eat the number
