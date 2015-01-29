@@ -14,8 +14,9 @@ namespace ScannerParser
         // current character on input
         private char? inputSym; //nullable
         private StreamReader input;
-
         private List<String> identifiers;
+        
+        public int PC; // current line number
         public double number; // the last nmber encountered
         public int id; // last identifier encountered
 
@@ -37,6 +38,7 @@ namespace ScannerParser
             identifiers = new List<String>();
             number = Int32.MinValue;
             id = -1;
+            PC = 1;
         }
 
         // Returns current token and advances to next token
