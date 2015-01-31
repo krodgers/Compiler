@@ -34,7 +34,7 @@ namespace ScannerParser
                 System.Environment.Exit(e.HResult);
 
             }
-            inputSym = (char)NextChar();
+            //inputSym = (char)NextChar();
             identifiers = new List<String>();
             number = Int32.MinValue;
             id = -1;
@@ -50,6 +50,8 @@ namespace ScannerParser
 
         private Token ParseNextToken()
         {
+            inputSym = NextChar(); // put at beginning of next token
+         
             if (inputSym == null)
                 return Token.EOF;
             Token res = Token.ERROR;
@@ -69,8 +71,8 @@ namespace ScannerParser
                         if (input.Peek() == '/')
                         {
                             input.ReadLine(); // is a comment and the line should be skipped
-                            //PC++; // count the comment line
-                            inputSym = NextChar();
+                            PC++; // count the comment line
+                            //inputSym = NextChar();
                             res = ParseNextToken();
                             return res;
                         }
@@ -166,7 +168,6 @@ namespace ScannerParser
             {
                 Error(e.Message);
             }
-            inputSym = NextChar(); // put at beginning of next token
             return res;
         }
 
