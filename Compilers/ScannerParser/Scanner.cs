@@ -252,7 +252,8 @@ namespace ScannerParser
             if (idx == -1)
             {
                 identifiers.Add(newIdent);
-                id++;
+                id = identifiers.Count -1;
+                
             } else {
                 id = idx;
             }

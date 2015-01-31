@@ -22,6 +22,8 @@ namespace ScannerParser
         BEGIN = 150, MAIN = 200, EOF = 255
     };
 
+
+    // TODO:: Where should we catch undeclared identifiers?
     public class Parser
     {
         private Token scannerSym; // current token on input
