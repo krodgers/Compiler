@@ -15,6 +15,7 @@ namespace ScannerParser
         private char? inputSym; //nullable
         private StreamReader input;
         private List<String> identifiers;
+        private const char ERROR_CHAR = (char)006;
 
         public int PC { get; private set; } // current line number
         public double number; // the last nmber encountered
@@ -31,10 +32,10 @@ namespace ScannerParser
             catch (Exception e)
             {
                 Error("Failed to open source file.\n" + e.Message);
-                System.Environment.Exit(e.HResult);
+//                System.Environment.Exit(e.HResult);
 
             }
-            //inputSym = (char)NextChar();
+            inputSym = 'm';
             identifiers = new List<String>();
             number = Int32.MinValue;
             id = -1;
@@ -50,10 +51,15 @@ namespace ScannerParser
 
         private Token ParseNextToken()
         {
+
             inputSym = NextChar(); // put at beginning of next token
-         
             if (inputSym == null)
                 return Token.EOF;
+            if (inputSym == ERROR_CHAR) // # means an error has been thrown
+                return Token.ERROR;
+
+           
+         
             Token res = Token.ERROR;
             char currChar = (char)inputSym;
             Token currToken;
@@ -174,6 +180,9 @@ namespace ScannerParser
         // Returns the next non whitespace character in the file
         private char? NextChar()
         {
+           if (inputSym == ERROR_CHAR)
+               return ERROR_CHAR;
+
             char? curr;
             do
             {
@@ -267,9 +276,13 @@ namespace ScannerParser
             if (input != null)
                 input.Close();
 
+            inputSym = ERROR_CHAR;
+
             Console.Error.Write(errMsg);
 
+            
         }
+
         // Returns the identifier with id idx
         public String Id2String(int idx)
         {
