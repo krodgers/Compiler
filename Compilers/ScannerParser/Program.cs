@@ -8,7 +8,9 @@ using System.Threading.Tasks;
 namespace ScannerParser {
     class Program {
         static void Main(string[] args) {
-            
+            Parser p = new Parser("test001.txt");
+            p.StartFirstPass();
+
             Console.ReadLine();
         }
     }

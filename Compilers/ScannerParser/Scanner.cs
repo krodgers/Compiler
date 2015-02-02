@@ -8,7 +8,8 @@ using System.Threading.Tasks;
 namespace ScannerParser
 {
 
-    // TODO:: built  in function tokens?
+    // TODO:: built  in function tokens
+    // TODO:: Parser Call needs to check for predefined function tokens
     public class Scanner
     {
         // current character on input
@@ -32,7 +33,7 @@ namespace ScannerParser
             catch (Exception e)
             {
                 Error("Failed to open source file.\n" + e.Message);
-//                System.Environment.Exit(e.HResult);
+                System.Environment.Exit(0);
 
             }
             inputSym = 'm';
@@ -210,12 +211,10 @@ namespace ScannerParser
                 word += ((char)NextChar()).ToString();
             }
             int num;
-            if (Int32.TryParse(word, out num))
-            {
+            if (Int32.TryParse(word, out num)) {
                 number = num;
                 res = Token.NUMBER;
-            }
-            else if (word.Equals("then"))
+            } else if (word.Equals("then"))
                 res = Token.THEN;
             else if (word.Equals("do"))
                 res = Token.DO;
@@ -245,8 +244,13 @@ namespace ScannerParser
                 res = Token.PROC;
             else if (word.Equals("main"))
                 res = Token.MAIN;
-            else
-            {
+            else if (word.Equals("OutputNum"))
+                res = Token.OUTPUTNUM;
+            else if (word.Equals("InputNum"))
+                res = Token.INPUTNUM;
+            else if (word.Equals("OutputNewLine"))
+                res = Token.OUTPUTNEWLINE;
+            else {
                 res = Token.IDENT;
                 AddIdent(word);
             }
@@ -278,7 +282,7 @@ namespace ScannerParser
 
             inputSym = ERROR_CHAR;
 
-            Console.Error.Write(errMsg);
+            Console.Write(errMsg);
 
             
         }

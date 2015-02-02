@@ -54,14 +54,28 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="TokenTestFileAssign.txt" />
-    <Content Include="TokenTestFileComment.txt" />
-    <Content Include="TokenTestFileKeyWords.txt" />
-    <Content Include="TokenTestFilePunct.txt" />
-    <Content Include="TokenTestFileRelOP.txt" />
+    <Content Include="TokenTestFileAssign.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TokenTestFileComment.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TokenTestFileKeyWords.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TokenTestFilePunct.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TokenTestFileRelOP.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <None Include="Resources\TokenTestFile.txt" />
-    <Content Include="test001.txt" />
-    <Content Include="TextExpression.txt" />
+    <Content Include="test001.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TextExpression.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
