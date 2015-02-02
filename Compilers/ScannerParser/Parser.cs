@@ -434,8 +434,9 @@ namespace ScannerParser {
                 Result res2 = Expression();
 
                  // TODO:: THis is wrong.  res1 and res2 may not be registers.  Should they be?
-                sw.WriteLine("{0} {1} {2} {3}", "add", res1.regNo, res2.regNo, "R0");
-                Console.WriteLine("{0} {1} {2} {3}", "add", res1.regNo, res2.regNo, "R0");
+              //  sw.WriteLine("{0} {1} {2} {3}", "add", res1.regNo, res2.regNo, "R0");
+                //Console.WriteLine("{0} {1} {2} {3}", "add", res1.regNo, res2.regNo, "R0");
+
             } else {
                 scanner.Error("Ended up at Assignment but didn't encounter let keyword");
             }
