@@ -56,6 +56,12 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="big.txt" />
+    <Content Include="cell.txt" />
+    <Content Include="factorial.txt" />
+    <Content Include="test002.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="TokenTestFileAssign.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

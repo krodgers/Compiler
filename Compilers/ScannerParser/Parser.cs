@@ -263,8 +263,9 @@ namespace ScannerParser {
             VerifyToken(Token.IDENT, "Ended up at Designator but didn't parse an identifier");
             res = Ident();
             if (scannerSym == Token.OPENBRACKET) {
+                Next(); // eat [
                 expr = Expression();
-                Next();
+               
                 VerifyToken(Token.CLOSEBRACKET, "Designator: Unmatched [.... missing ]");
                 Next();
                 // todo, this is for array, need to change it but not yet
@@ -458,7 +459,9 @@ namespace ScannerParser {
 
                 // Needs to output a move instruction which for now will be done here,
                 // but maybe should be moved elsewhere
-                PutF2("mov", ResolveResultValue(res2), ResolveResultValue(res1));
+                // Should the order be "opcode res1 res2" where res2 goes into res1?
+                PutF2("mov", ResolveResultValue(res1), ResolveResultValue(res2));
+             //   PutF2("mov", ResolveResultValue(res2), ResolveResultValue(res1));
                 AssemblyPC++;
 
                 // TODO:: THis is wrong.  res1 and res2 may not be registers.  Should they be?
@@ -588,7 +591,7 @@ namespace ScannerParser {
             return res;
         }
 
-
+        // TODO:: Functions must have a return statement
         private void Main() {
             if (VerifyToken(Token.MAIN, "Missing Main Function")) {// find "main"
                 Next();
@@ -605,7 +608,7 @@ namespace ScannerParser {
                     StatSequence();
                 }
                 // end program
-                if (VerifyToken(Token.CLOSEBRACKET, "Missing closing bracket of program")) {
+                if (VerifyToken(Token.END, "Missing closing bracket of program")) {
                     Next();
                     if (VerifyToken(Token.PERIOD, "Unexpected end of program - missing period")) {
                         sw.WriteLine("RET 0");
@@ -618,12 +621,16 @@ namespace ScannerParser {
 
 
         private void FuncDecl() {
+           
             if (scannerSym == Token.FUNC || scannerSym == Token.PROC) {
                 Next();
+            } else {
+                scanner.Error("Function Declaration missing function/ procedure keyword");
             }
             VerifyToken(Token.IDENT, "Function/Procedure declaration missing a name");
             Ident();
             if (scannerSym == Token.OPENPAREN) {
+                Next(); // eat openParen
                 // Formal Parameter
                 if (scannerSym == Token.IDENT) {
                     Ident();
@@ -633,19 +640,24 @@ namespace ScannerParser {
                     }
                 }
                 VerifyToken(Token.CLOSEPAREN, "Function Declaration missing a closing parenthesis");
+                Next(); // eat closeparen
             }
             VerifyToken(Token.SEMI, "Function Declaration missing a semicolon");
+            Next(); // eat semi
             // Func Body
             // Variable declarations
             while (scannerSym == Token.VAR || scannerSym == Token.ARR) {
                 VarDecl();
             }
-            VerifyToken(Token.OPENBRACKET, "Function body missing open bracket");
+            VerifyToken(Token.BEGIN, "Function body missing open bracket");
+            Next(); // eat {
             // function statements
             StatSequence();
 
-            VerifyToken(Token.CLOSEBRACKET, "Function Body missing closing bracket"); //end function body
+            VerifyToken(Token.END, "Function Body missing closing bracket"); //end function body
+            Next(); // eat }
             VerifyToken(Token.SEMI, "Function declaration missing semicolon"); // end function declaration
+            Next(); // eat ;
         }
 
 
@@ -690,7 +702,7 @@ namespace ScannerParser {
             VerifyToken(Token.WHILE, "Got to while statement without seeing the while keyword");
             Next(); // eat while
             Result res = Relation();
-            VerifyToken(Token.WHILE, "No do keyword after the relation in while statement");
+            VerifyToken(Token.DO, "No do keyword after the relation in while statement");
             Next(); // eat do
             if (res.condition != CondOp.ERR) {
                 string negatedTokenString = TokenToInstruction(NegatedConditional(res.condition));
@@ -709,6 +721,7 @@ namespace ScannerParser {
 
         private Result ReturnStatement() {
             VerifyToken(Token.RETURN, "Missing return keyword");
+            Next();
             Result res = null;
             if (scannerSym == Token.IDENT) {
                 res = Expression();
@@ -746,9 +759,14 @@ namespace ScannerParser {
                     Next(); // eat [
                     Number();
                     VerifyToken(Token.CLOSEBRACKET, "Array declaraion missing ]");
-                } while (scannerSym != Token.SEMI);
+                    Next();
+                   
+                   
+                } while (scannerSym != Token.IDENT);
 
-
+                VerifyToken(Token.IDENT, "Array declaration missing name");
+                Next(); // eat ident
+              
             }
 
             VerifyToken(Token.SEMI, "Missing semicolon at end of variable declaration");
