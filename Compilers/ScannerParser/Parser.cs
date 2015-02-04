@@ -32,12 +32,14 @@ namespace ScannerParser {
         private FileStream fs; //debug
         private StreamWriter sw;
         private int currRegister;
+        private int AssemblyPC;
 
         public Parser(String file) {
             scanner = new Scanner(file);
             fs = File.Open(@"../../output.txt", FileMode.Create, FileAccess.ReadWrite);
             sw = new StreamWriter(fs);
             Init();
+            AssemblyPC = 1;
         }
 
         // Sets initial state of parser
@@ -246,6 +248,7 @@ namespace ScannerParser {
                     Next();
                 }
                 else {
+                    // todo, evaluate when this happens
                     sw.WriteLine("Load {0}[{1}] R{2}", res.valueS, res.valueD, currRegister);
                     Console.WriteLine("Load {0}[{1}] R{2}", res.valueS, res.valueD, currRegister);
                     res = new Result(Kind.REG, currRegister); // TODO:: Or a variable?
@@ -264,6 +267,7 @@ namespace ScannerParser {
                 Next();
                 VerifyToken(Token.CLOSEBRACKET, "Designator: Unmatched [.... missing ]");
                 Next();
+                // todo, this is for array, need to change it but not yet
                 AllocateRegister();
                 sw.WriteLine("Load {0}[{1}] R{2}", res.valueS, expr.valueD, currRegister);
                 Console.WriteLine("Load {0}[{1}] R{2}", res.valueS, expr.valueD, currRegister);
@@ -338,12 +342,13 @@ namespace ScannerParser {
                 case Token.OUTPUTNUM:
                     Next(); // eat OutputNum
                     VerifyToken(Token.OPENPAREN, "OutputNum missing (");
+                    Next();
 
                     if (scannerSym == Token.CALL)
                         res = FuncCall();
                     else if (scannerSym == Token.NUMBER || scannerSym == Token.IDENT)
                         res = Expression();
-                    sw.WriteLine("WRD " + res.valueD);
+                    sw.WriteLine("WRD " + ResolveResultValue(res));
 
                     VerifyToken(Token.CLOSEPAREN, "OutputNum missing )");
                     Next(); // eat )
@@ -357,7 +362,7 @@ namespace ScannerParser {
                     VerifyToken(Token.CLOSEPAREN, "InputNum has too many arguments or is missing )");
                     AllocateRegister();
                     res = new Result(Kind.REG, currRegister);
-                    sw.WriteLine("RDD {0}", res.regNo);
+                    //sw.WriteLine("RDD {0}", res.regNo);
                     break;
 
                 default:
@@ -384,7 +389,7 @@ namespace ScannerParser {
                     if (VerifyToken(Token.THEN, "The then keyword did not follow the relation in if statement")) {
                         if (res.condition != CondOp.ERR) {
                             string negatedTokenString = TokenToInstruction(NegatedConditional(res.condition));
-                            PutF1(negatedTokenString, res, new Result(Kind.CONST, "offset"));
+                            //PutF1(negatedTokenString, res, new Result(Kind.CONST, "offset")); //todo, need to fix for new PutF1 stuff
                         }
                         else {
                             scanner.Error("The relation in the if did not contain a valid conditional operator");
@@ -451,9 +456,14 @@ namespace ScannerParser {
                 Next();
                 Result res2 = Expression();
 
+                // Needs to output a move instruction which for now will be done here,
+                // but maybe should be moved elsewhere
+                PutF2("mov", ResolveResultValue(res2), ResolveResultValue(res1));
+                AssemblyPC++;
+
                 // TODO:: THis is wrong.  res1 and res2 may not be registers.  Should they be?
-                sw.WriteLine("{0} {1} {2} {3}", assignSym, res1.regNo, res2.regNo, "R0");
-                Console.WriteLine("{0} {1} {2} {3}", assignSym, res1.regNo, res2.regNo, "R0");
+                //sw.WriteLine("{0} {1} {2} {3}", assignSym, res1.regNo, res2.regNo, "R0"); // todo, need to modify for becomes case
+                //Console.WriteLine("{0} {1} {2} {3}", assignSym, res1.regNo, res2.regNo, "R0");
             }
             else {
                 scanner.Error("Ended up at Assignment but didn't encounter let keyword");
@@ -466,7 +476,7 @@ namespace ScannerParser {
             if (A.type == Kind.VAR && B.type == Kind.VAR) {
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
-                        PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B);
+                        res = PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
@@ -476,7 +486,18 @@ namespace ScannerParser {
             else if (A.type == Kind.VAR && B.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
-                        PutArithmeticImmInstruction(TokenToInstruction(opCode), A, B);
+                        res = PutArithmeticImmInstruction(TokenToInstruction(opCode), A, B);
+                        break;
+                    case OpCodeClass.COMPARE:
+                        break;
+                }
+                //PutF1(TokenToInstruction(opCode) + "i", loadedA, B);
+
+            }
+            else if (A.type == Kind.REG && B.type == Kind.CONST) {
+                switch (GetOpCodeClass(opCode, true)) {
+                    case OpCodeClass.ARITHMETIC_IMM:
+                        res = PutArithmeticImmInstruction(TokenToInstruction(opCode), A, B);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
@@ -486,21 +507,61 @@ namespace ScannerParser {
             }
             else if (A.type == Kind.VAR && B.type == Kind.REG) {
                 // todo, fill in later because reg is weird right now
+
+                switch (GetOpCodeClass(opCode)) {
+                    case OpCodeClass.ARITHMETIC_REG:
+                        res = PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B);
+                        break;
+                    case OpCodeClass.COMPARE:
+                        break;
+                }
                 //PutF2(TokenToInstruction(opCode), loadedA, B);
 
             }
-            else if (B.type == Kind.VAR && A.type == Kind.VAR) {
+            else if (B.type == Kind.REG && A.type == Kind.REG) {
 
+                switch (GetOpCodeClass(opCode)) {
+                    case OpCodeClass.ARITHMETIC_REG:
+                        res = PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B);
+                        break;
+                    case OpCodeClass.COMPARE:
+                        break;
+                }
                 //PutF2(TokenToInstruction(opCode), loadedB, loadedA);
             }
             else if (B.type == Kind.VAR && A.type == Kind.CONST) {
 
+                switch (GetOpCodeClass(opCode, true)) {
+                    case OpCodeClass.ARITHMETIC_IMM:
+                        res = PutArithmeticImmInstruction(TokenToInstruction(opCode), B, A);
+                        break;
+                    case OpCodeClass.COMPARE:
+                        break;
+                }
                 //PutF1(TokenToInstruction(opCode) + "i", loadedB, A);
 
             }
             else if (B.type == Kind.VAR && A.type == Kind.REG) {
 
+                switch (GetOpCodeClass(opCode)) {
+                    case OpCodeClass.ARITHMETIC_REG:
+                        res = PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B);
+                        break;
+                    case OpCodeClass.COMPARE:
+                        break;
+                }
                 //PutF2(TokenToInstruction(opCode), loadedB, A);
+
+            }
+            else if (B.type == Kind.REG && A.type == Kind.CONST) {
+                switch (GetOpCodeClass(opCode, true)) {
+                    case OpCodeClass.ARITHMETIC_IMM:
+                        res = PutArithmeticImmInstruction(TokenToInstruction(opCode), B, A);
+                        break;
+                    case OpCodeClass.COMPARE:
+                        break;
+                }
+                //PutF1(TokenToInstruction(opCode) + "i", loadedA, B);
 
             }
             // This case causes issues with register allocation as it
@@ -633,7 +694,7 @@ namespace ScannerParser {
             Next(); // eat do
             if (res.condition != CondOp.ERR) {
                 string negatedTokenString = TokenToInstruction(NegatedConditional(res.condition));
-                PutF1(negatedTokenString, res, new Result(Kind.CONST, "offset"));
+                //PutF1(negatedTokenString, res, new Result(Kind.CONST, "offset")); //todo, fix for new PutF1 stuff
                 StatSequence();
                 // todo, here we will need a branch to loop header
                 VerifyToken(Token.OD, "The while loop was not properly closed with the od keyword");
@@ -730,53 +791,127 @@ namespace ScannerParser {
             }
         }
 
-        private Result LoadVariable(Result r) {
-            AllocateRegister();
-            sw.WriteLine("load R{1} {0}", r.valueS, currRegister);
-            Console.WriteLine("load R{1} {0}", r.valueS, currRegister);
-            Result res = new Result();
-            res.regNo = currRegister;
-            res.type = Kind.REG;
+        // If you feed a Result to this, it will pull out the right value
+        private string ResolveResultValue(Result res) {
+            string s = null;
+            switch (res.type) {
+                case Kind.VAR:
+                    s = res.valueS;
+                    break;
+                case Kind.REG:
+                    s = res.regName;
+                    break;
+                case Kind.COND:
+                    s = res.regName;
+                    break;
+                case Kind.CONST:
+                    switch (res.constantType) {
+                        case ConstantType.DOUBLE:
+                            s = res.valueD.ToString();
+                            break;
+                        case ConstantType.STRING:
+                            s = res.valueS;
+                            break;
+                    }
+                    break;
+            }
+            return s;
+        }
+
+        //private Result LoadVariable(Result r) {
+        //    AllocateRegister();
+        //    sw.WriteLine("load R{1} {0}", r.valueS, currRegister);
+        //    Console.WriteLine("load R{1} {0}", r.valueS, currRegister);
+        //    Result res = new Result();
+        //    res.regNo = currRegister;
+        //    res.type = Kind.REG;
+        //    return res;
+        //}
+
+        // This function puts an arithmetic instruction where all arguments are registers
+        // or variables (but will need to only be registers in the final output, but this
+        // should be handled by SSA)
+        private Result PutArithmeticRegInstruction(string opCode, Result a, Result b) {
+
+            if (a.type == Kind.REG && b.type == Kind.REG)
+                PutF2(opCode, a.regName, b.regName);
+            else if (a.type == Kind.REG && b.type == Kind.VAR) {
+                PutF2(opCode, a.regName, b.valueS);
+            }
+            else if (a.type == Kind.VAR && b.type == Kind.REG) {
+                PutF2(opCode, a.valueS, b.regName);
+            }
+            else {
+                PutF2(opCode, a.valueS, b.valueS);
+            }
+
+            Result res = new Result(Kind.REG, String.Format("({0})", AssemblyPC));
+            AssemblyPC++;
             return res;
         }
 
-        private Result PutArithmeticRegInstruction(string opCode, Result a, Result b) {
-
-            return null;
-        }
-
+        // This function puts an arithmetic instruction where the first arguments is a register
+        // or a variable and the second argument is an immediate
         private Result PutArithmeticImmInstruction(string opCode, Result a, Result b) {
 
-            return null;
+            opCode += "i";
+
+            if (a.type == Kind.REG && b.constantType == ConstantType.DOUBLE)
+                PutF1(opCode, a.regName, b.valueD);
+            else if (a.type == Kind.REG && b.constantType == ConstantType.STRING) {
+                PutF1(opCode, a.regName, b.valueS);
+            }
+            else if (a.type == Kind.VAR && b.constantType == ConstantType.DOUBLE) {
+                PutF1(opCode, a.valueS, b.valueD);
+            }
+            else {
+                PutF1(opCode, a.valueS, b.valueS);
+            }
+            
+            Result res = new Result(Kind.REG, String.Format("({0})", AssemblyPC));
+            AssemblyPC++;
+            return res;
         }
 
-        private void PutF2(string opString, Result a, Result b) {
-            sw.WriteLine("{0} {1} {2} {3}", opString, currRegister, a.regNo, b.regNo);
-            Console.WriteLine("{0} {1} {2} {3}", opString, currRegister, a.regNo, b.regNo);
+        // todo, both PutF1 and PutF2 were changed to take strings rather than Results because
+        // registers are not available
+        // This function, along with the other puts output assembly in the following format:
+        // opcode (resultReg) (argReg1) (argReg2)
+        // This may need to be changed because in his examples the instructions only have
+        // two arguments and do not have the result register specified.
+        private void PutF2(string opString, string a, string b) {
+            sw.WriteLine("{0} {1} {2} {3}", opString, String.Format("({0})", AssemblyPC), a, b);
+            Console.WriteLine("{0} {1} {2} {3}", opString, String.Format("({0})", AssemblyPC), a, b);
         }
 
+
+        private void PutF1(string op, string a, double b) {
+            sw.WriteLine("{0} {1} {2} {3}", op, String.Format("({0})", AssemblyPC), a, b);
+            Console.WriteLine("{0} {1} {2} {3}", op, String.Format("({0})", AssemblyPC), a, b);
+        }
 
         // Creates a F1 instruction
         // Result b should be the Constant
-        private void PutF1(string op, Result a, Result b) {
+        private void PutF1(string op, string a, string b) {
+            sw.WriteLine("{0} {1} {2} {3}", op, String.Format("({0})", AssemblyPC), a, b);
+            Console.WriteLine("{0} {1} {2} {3}", op, String.Format("({0})", AssemblyPC), a, b);
+            //if (b.type == Kind.CONST) {
+            //    sw.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.valueD);
+            //    Console.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.valueD);
 
-            if (b.type == Kind.CONST) {
-                sw.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.valueD);
-                Console.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.valueD);
+            //}
+            //else if (a.type == Kind.COND) {
+            //    // todo, the value for the second parameter shouldn't be a string
+            //    // it needs to be the offset, but don't know how to do that yet
+            //    sw.WriteLine("{0} {1} {2}", op, a.regNo, b.valueS);
+            //    Console.WriteLine("{0} {1} {2}", op, a.regNo, b.valueS);
+            //}
+            //else {
+            //    Console.WriteLine("PutF1 paramters in wrong order.");
+            //    sw.WriteLine("{0} {1} {2} {3}", op, currRegister, b.regNo, a.valueD);
+            //    Console.WriteLine("{0} {1} {2} {3}", op, currRegister, b.regNo, a.valueD);
 
-            }
-            else if (a.type == Kind.COND) {
-                // todo, the value for the second parameter shouldn't be a string
-                // it needs to be the offset, but don't know how to do that yet
-                sw.WriteLine("{0} {1} {2}", op, a.regNo, b.valueS);
-                Console.WriteLine("{0} {1} {2}", op, a.regNo, b.valueS);
-            }
-            else {
-                Console.WriteLine("PutF1 paramters in wrong order.");
-                sw.WriteLine("{0} {1} {2} {3}", op, currRegister, b.regNo, a.valueD);
-                Console.WriteLine("{0} {1} {2} {3}", op, currRegister, b.regNo, a.valueD);
-
-            }
+            //}
 
 
         }
