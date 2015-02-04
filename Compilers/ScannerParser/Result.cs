@@ -7,10 +7,12 @@ using System.Threading.Tasks;
 namespace ScannerParser {
     public enum Kind { VAR, COND, REG, CONST };
     public enum CondOp { GT, LT, LEQ, GEQ, EQ, NEQ, ERR };
+    public enum ConstantType { STRING, INT, DOUBLE, BOOLEAN };
     class Result {
         public Kind type;
-        public int regNo;
+        public string regName;
         public CondOp? condition; // the condition operator, if this is a condition
+        public ConstantType? constantType;
         public int fixUpLoc;
         public double valueD; // value of constant
         public string valueS; // value of constant or the variable name
@@ -21,13 +23,24 @@ namespace ScannerParser {
                 Console.WriteLine("WARNING: Initializing Result with wrong value type");
             type = myType;
             valueD = myValue;
+            constantType = ConstantType.DOUBLE;
 
         }
         public Result(Kind myType, string myValue) {
-            if (myType != Kind.CONST || myType != Kind.VAR)
+            if (myType == Kind.CONST || myType == Kind.VAR) {
+                type = myType;
+                valueS = myValue;
+
+                if (myType == Kind.CONST)
+                    constantType = ConstantType.STRING;
+            }
+            else if (myType == Kind.REG) {
+                type = myType;
+                regName = myValue;
+            }
+            else {
                 Console.WriteLine("WARNING: Initializing Result with wrong value type");
-            type = myType;
-            valueS = myValue;
+            }
 
         }
         public Result(Kind myType, bool myValue) {
@@ -37,13 +50,7 @@ namespace ScannerParser {
             valueB = myValue;
 
         }
-        public Result(Kind myType, int registerNum) {
-            if (myType != Kind.REG)
-                Console.WriteLine("WARNING: Initializing Result with wrong value type");
-            type = myType;
-            regNo = registerNum;
-
-        }
+        
         public Result() {
 
         }
