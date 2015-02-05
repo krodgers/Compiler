@@ -9,7 +9,7 @@ namespace ScannerParser {
         public int blockNum { private set; get; } // which block this is
         public Instruction firstInstruction;// 
         public BasicBlock dominatingBlock; // 
-        public BasicBlock parentBlock;
+        public List<BasicBlock> parentBlocks;
         public List<BasicBlock> childBlocks;  // block(s) with the instructions that follow this block's
 
 
