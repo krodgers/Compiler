@@ -33,6 +33,10 @@ namespace ScannerParser {
         private StreamWriter sw;
         private int currRegister;
         private int AssemblyPC;
+        private BasicBlock rootBasicBlock;
+        private BasicBlock curBasicBlock;
+        private int curBasicBlockNum;
+        private Stack<BasicBlock> parentBlocks;
 
         public Parser(String file) {
             scanner = new Scanner(file);
@@ -40,6 +44,9 @@ namespace ScannerParser {
             sw = new StreamWriter(fs);
             Init();
             AssemblyPC = 1;
+            curBasicBlockNum = 1;
+            curBasicBlock = null;
+            parentBlocks = new Stack<BasicBlock>();
         }
 
         // Sets initial state of parser
@@ -61,6 +68,9 @@ namespace ScannerParser {
         }
 
         public void StartFirstPass() {
+            rootBasicBlock = new BasicBlock(curBasicBlockNum++);
+            rootBasicBlock.childBlocks = new List<BasicBlock>();
+            curBasicBlock = rootBasicBlock;
             Main();
         }
 
@@ -395,12 +405,32 @@ namespace ScannerParser {
                         else {
                             scanner.Error("The relation in the if did not contain a valid conditional operator");
                         }
+
+                        // Create the appropriate basic blocks
+                        // First create the join block
+                        //BasicBlock joinBlock = new BasicBlock(curBasicBlockNum++);
+
+
                         Next();
+                        parentBlocks.Push(curBasicBlock);
+                        BasicBlock ifBlock = new BasicBlock(curBasicBlockNum++);
+                        ifBlock.childBlocks = new List<BasicBlock>();
+                        ifBlock.parentBlock = curBasicBlock;
+                        ifBlock.parentBlock.childBlocks.Add(ifBlock);
+                        curBasicBlock = ifBlock;
                         StatSequence();
+                        curBasicBlock = parentBlocks.Pop();
 
                         if (scannerSym == Token.ELSE) {
+                            parentBlocks.Push(curBasicBlock);
+                            BasicBlock elseBlock = new BasicBlock(curBasicBlockNum++);
+                            elseBlock.childBlocks = new List<BasicBlock>();
+                            elseBlock.parentBlock = curBasicBlock;
+                            elseBlock.parentBlock.childBlocks.Add(elseBlock);
+                            curBasicBlock = elseBlock;
                             Next();
                             StatSequence();
+                            curBasicBlock = parentBlocks.Pop();
                         }
                         else if (scannerSym == Token.FI) {
                             Next();

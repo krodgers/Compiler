@@ -11,21 +11,21 @@ namespace ScannerParser {
         public Instruction[] neededInstr; // instructions whose values this instruction needs
         public Instruction next;
         public Instruction prev;
-        public BoundingBlock myBoundingBlock{private set; get;}
+        public BasicBlock myBoundingBlock{private set; get;}
         public string actualInstruction; // i.e mul x_1 #3
 
-        public Instruction(int instructionNumber, BoundingBlock myBB){
+        public Instruction(int instructionNumber, BasicBlock myBB){
             neededInstr = new Instruction[2];
 
         }
 
-        public Instruction(int instructionNumber, BoundingBlock myBB, string instructionText) {
+        public Instruction(int instructionNumber, BasicBlock myBB, string instructionText) {
             neededInstr = new Instruction[2];
             actualInstruction = instructionText;
 
         }
 
-        public void AddToBoundingBlock(BoundingBlock bb) {
+        public void AddToBoundingBlock(BasicBlock bb) {
             myBoundingBlock = bb;
         }
 
