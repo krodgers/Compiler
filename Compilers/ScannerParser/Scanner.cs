@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 namespace ScannerParser
 {
 
+    // TODO:: add DOT things to bounding block class
     // TODO:: built  in function tokens
     // TODO:: Parser Call needs to check for predefined function tokens
     public class Scanner
@@ -283,7 +284,7 @@ namespace ScannerParser
             inputSym = ERROR_CHAR;
 
             Console.Write(errMsg);
-
+            System.Environment.Exit(0);
             
         }
 
