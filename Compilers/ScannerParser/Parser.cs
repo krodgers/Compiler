@@ -179,7 +179,7 @@ namespace ScannerParser {
         //    if (A.type == Kind.CONST && B.type == Kind.CONST) {
         //        switch (Op.condition) {
         //             case CondOp.EQ:
-        //                return (A.valueD == B.valueD).ToString();
+        //                return (A.GetValue() == B.GetValue()).ToString();
         //            break;
         //                // TODO:: Rest of options
 
@@ -224,15 +224,13 @@ namespace ScannerParser {
                     if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER) {
                         resB = Factor();
                         res = Combine(tmp, res, resB);
-                    }
-                    else {
+                    } else {
                         scanner.Error("Reached Term but don't have an Identifier or Number");
                     }
 
                 }
 
-            }
-            else {
+            } else {
                 scanner.Error("Reached Term but don't have an Identifier or Number");
             }
             return res;
@@ -242,25 +240,21 @@ namespace ScannerParser {
             Result res = null;
             if (scannerSym == Token.IDENT) {
                 res = Designator();
-            }
-            else if (scannerSym == Token.NUMBER) {
-                res = new Result(Kind.CONST, Number().valueD);
+            } else if (scannerSym == Token.NUMBER) {
+                res = new Result(Kind.CONST, Number().GetValue());
 
-            }
-            else if (scannerSym == Token.FUNC) {
+            } else if (scannerSym == Token.FUNC) {
                 // TODO:: Function things
-                res = new Result();
-            }
-            else if (scannerSym == Token.OPENPAREN) {
+                res = null;
+            } else if (scannerSym == Token.OPENPAREN) {
                 Next();
                 res = Expression();
                 if (scannerSym == Token.CLOSEPAREN) {
                     Next();
-                }
-                else {
+                } else {
                     // todo, evaluate when this happens
-                    sw.WriteLine("Load {0}[{1}] R{2}", res.valueS, res.valueD, currRegister);
-                    Console.WriteLine("Load {0}[{1}] R{2}", res.valueS, res.valueD, currRegister);
+                    sw.WriteLine("Load {0}[{1}] R{2}", res.GetValue(), res.GetValue(), currRegister);
+                    Console.WriteLine("Load {0}[{1}] R{2}", res.GetValue(), res.GetValue(), currRegister);
                     res = new Result(Kind.REG, currRegister); // TODO:: Or a variable?
                 }
 
@@ -268,21 +262,59 @@ namespace ScannerParser {
             return res;
         }
 
+        // TODO:: When storing/loading, need 
+        // ADDA Base_Ptr Array_Loc
+        // LOAD/STORE
+        private Result MakeArrayReference(Result res) {
+            // find dimensions of array -- > requires symbol table look up
+            int[] arrDims = GetArrayDimensions(res.GetValue());
+            
+            Result[] indexer = new Result[arrDims.Length];
+
+            
+            for (int i = 0; i < arrDims.Length; i++) {
+                VerifyToken(Token.OPENBRACKET, "Array missing open bracket");
+                Next();
+                // evaluate indices
+                indexer[i] = Expression();
+                VerifyToken(Token.CLOSEBRACKET, "Array missing closing bracket");
+                Next();
+            }
+
+
+            return new Result(Kind.ARR, res.GetValue(), indexer);
+
+        }
+
+        // TODO:: Track Array Dimensions
+        // TODO:: Handle Arrays correctly --> getting address when needed
+
+        private int[] GetArrayDimensions(string arrayName) {
+
+
+            return new int[4];
+        }
+
+        // Returns result with the designator thing in a variable
         private Result Designator() {
             Result res = null, expr = null;
             VerifyToken(Token.IDENT, "Ended up at Designator but didn't parse an identifier");
             res = Ident();
             if (scannerSym == Token.OPENBRACKET) {
                 Next(); // eat [
-                expr = Expression();
-               
+
+                res = MakeArrayReference(res);
+
+
                 VerifyToken(Token.CLOSEBRACKET, "Designator: Unmatched [.... missing ]");
                 Next();
+
+
                 // todo, this is for array, need to change it but not yet
-                AllocateRegister();
-                sw.WriteLine("Load {0}[{1}] R{2}", res.valueS, expr.valueD, currRegister);
-                Console.WriteLine("Load {0}[{1}] R{2}", res.valueS, expr.valueD, currRegister);
-                res = new Result(Kind.REG, currRegister); // TODO:: Or a variable?
+
+                // res = new Result(Kind.REG, currRegister); // TODO:: Or a variable?
+                // res = new Result(Kind.CONST, ConstantType.ADDR, something);
+                res = new Result(Kind.VAR, res.GetValue());
             }
 
 
@@ -314,8 +346,7 @@ namespace ScannerParser {
                         if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER) {
                             optionalArguments = new List<Result>();
                             optionalArguments.Add(Expression());
-                        }
-                        else {
+                        } else {
                             Next();
                         }
                         // TODO code that handles expression in parentheses or another function
@@ -325,8 +356,7 @@ namespace ScannerParser {
                             if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER ||
                                 scannerSym == Token.OPENPAREN || scannerSym == Token.CALL) {
                                 optionalArguments.Add(Expression());
-                            }
-                            else {
+                            } else {
                                 scanner.Error("Ended up in optional arguments of function call and didn't parse a number, variable, comma, or expression");
                             }
                         }
@@ -359,7 +389,7 @@ namespace ScannerParser {
                         res = FuncCall();
                     else if (scannerSym == Token.NUMBER || scannerSym == Token.IDENT)
                         res = Expression();
-                    sw.WriteLine("WRD " + ResolveResultValue(res));
+                    sw.WriteLine("WRD " + res.GetValue());
 
                     VerifyToken(Token.CLOSEPAREN, "OutputNum missing )");
                     Next(); // eat )
@@ -401,8 +431,7 @@ namespace ScannerParser {
                         if (res.condition != CondOp.ERR) {
                             string negatedTokenString = TokenToInstruction(NegatedConditional(res.condition));
                             //PutF1(negatedTokenString, res, new Result(Kind.CONST, "offset")); //todo, need to fix for new PutF1 stuff
-                        }
-                        else {
+                        } else {
                             scanner.Error("The relation in the if did not contain a valid conditional operator");
                         }
 
@@ -415,8 +444,9 @@ namespace ScannerParser {
                         parentBlocks.Push(curBasicBlock);
                         BasicBlock ifBlock = new BasicBlock(curBasicBlockNum++);
                         ifBlock.childBlocks = new List<BasicBlock>();
-                        ifBlock.parentBlock = curBasicBlock;
-                        ifBlock.parentBlock.childBlocks.Add(ifBlock);
+                        ifBlock.parentBlocks.Add(curBasicBlock);
+                        // I don't know what this is doing....
+                        //  ifBlock.parentBlocks.childBlocks.Add(ifBlock);
                         curBasicBlock = ifBlock;
                         StatSequence();
                         curBasicBlock = parentBlocks.Pop();
@@ -425,17 +455,15 @@ namespace ScannerParser {
                             parentBlocks.Push(curBasicBlock);
                             BasicBlock elseBlock = new BasicBlock(curBasicBlockNum++);
                             elseBlock.childBlocks = new List<BasicBlock>();
-                            elseBlock.parentBlock = curBasicBlock;
-                            elseBlock.parentBlock.childBlocks.Add(elseBlock);
+                            elseBlock.parentBlocks.Add(curBasicBlock);
+                            //  elseBlock.parentBlock.childBlocks.Add(elseBlock);
                             curBasicBlock = elseBlock;
                             Next();
                             StatSequence();
                             curBasicBlock = parentBlocks.Pop();
-                        }
-                        else if (scannerSym == Token.FI) {
+                        } else if (scannerSym == Token.FI) {
                             Next();
-                        }
-                        else {
+                        } else {
                             scanner.Error("In the if statement and found no token that matches either an else or a then");
                         }
                     }
@@ -443,11 +471,11 @@ namespace ScannerParser {
 
                 }
 
-            }
-            else {
+            } else {
                 scanner.Error("Ended up at If Statement but didn't parse the if keyword");
             }
-            return new Result(); // todo, I don't have any idea what should be in this result, or if it's even needed
+            // return new Result(); // todo, I don't have any idea what should be in this result, or if it's even needed
+            return null;
         }
 
         private Result Ident() {
@@ -471,8 +499,9 @@ namespace ScannerParser {
             Next();
             res2 = Expression();
             finalResult = Combine(cond, res1, res2);
-            finalResult.type = Kind.COND;
-            finalResult.condition = Result.TokenToCondition(cond);
+            finalResult = new Result(Kind.COND, Result.TokenToCondition(cond), AssemblyPC);
+
+
             return finalResult;
         }
         // TODO:: Should this return a result?  Like which register the assignment has been loaded into??
@@ -490,21 +519,20 @@ namespace ScannerParser {
                 // Needs to output a move instruction which for now will be done here,
                 // but maybe should be moved elsewhere
                 // Should the order be "opcode res1 res2" where res2 goes into res1?
-                PutF2("mov", ResolveResultValue(res1), ResolveResultValue(res2));
-             //   PutF2("mov", ResolveResultValue(res2), ResolveResultValue(res1));
+                PutF2("mov", res1.GetValue(), res2.GetValue());
+                //   PutF2("mov", ResolveResultValue(res2), ResolveResultValue(res1));
                 AssemblyPC++;
 
                 // TODO:: THis is wrong.  res1 and res2 may not be registers.  Should they be?
                 //sw.WriteLine("{0} {1} {2} {3}", assignSym, res1.regNo, res2.regNo, "R0"); // todo, need to modify for becomes case
                 //Console.WriteLine("{0} {1} {2} {3}", assignSym, res1.regNo, res2.regNo, "R0");
-            }
-            else {
+            } else {
                 scanner.Error("Ended up at Assignment but didn't encounter let keyword");
             }
         }
 
         private Result Combine(Token opCode, Result A, Result B) {
-            Result res = new Result();
+            Result res = null; ;
 
             if (A.type == Kind.VAR && B.type == Kind.VAR) {
                 switch (GetOpCodeClass(opCode)) {
@@ -515,8 +543,7 @@ namespace ScannerParser {
                         break;
                 }
                 //PutF2(TokenToInstruction(opCode), loadedA, loadedB);
-            }
-            else if (A.type == Kind.VAR && B.type == Kind.CONST) {
+            } else if (A.type == Kind.VAR && B.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
                         res = PutArithmeticImmInstruction(TokenToInstruction(opCode), A, B);
@@ -526,8 +553,7 @@ namespace ScannerParser {
                 }
                 //PutF1(TokenToInstruction(opCode) + "i", loadedA, B);
 
-            }
-            else if (A.type == Kind.REG && B.type == Kind.CONST) {
+            } else if (A.type == Kind.REG && B.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
                         res = PutArithmeticImmInstruction(TokenToInstruction(opCode), A, B);
@@ -537,8 +563,7 @@ namespace ScannerParser {
                 }
                 //PutF1(TokenToInstruction(opCode) + "i", loadedA, B);
 
-            }
-            else if (A.type == Kind.VAR && B.type == Kind.REG) {
+            } else if (A.type == Kind.VAR && B.type == Kind.REG) {
                 // todo, fill in later because reg is weird right now
 
                 switch (GetOpCodeClass(opCode)) {
@@ -550,8 +575,7 @@ namespace ScannerParser {
                 }
                 //PutF2(TokenToInstruction(opCode), loadedA, B);
 
-            }
-            else if (B.type == Kind.REG && A.type == Kind.REG) {
+            } else if (B.type == Kind.REG && A.type == Kind.REG) {
 
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
@@ -561,8 +585,7 @@ namespace ScannerParser {
                         break;
                 }
                 //PutF2(TokenToInstruction(opCode), loadedB, loadedA);
-            }
-            else if (B.type == Kind.VAR && A.type == Kind.CONST) {
+            } else if (B.type == Kind.VAR && A.type == Kind.CONST) {
 
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
@@ -573,8 +596,7 @@ namespace ScannerParser {
                 }
                 //PutF1(TokenToInstruction(opCode) + "i", loadedB, A);
 
-            }
-            else if (B.type == Kind.VAR && A.type == Kind.REG) {
+            } else if (B.type == Kind.VAR && A.type == Kind.REG) {
 
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
@@ -585,8 +607,7 @@ namespace ScannerParser {
                 }
                 //PutF2(TokenToInstruction(opCode), loadedB, A);
 
-            }
-            else if (B.type == Kind.REG && A.type == Kind.CONST) {
+            } else if (B.type == Kind.REG && A.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
                         res = PutArithmeticImmInstruction(TokenToInstruction(opCode), B, A);
@@ -597,21 +618,21 @@ namespace ScannerParser {
                 //PutF1(TokenToInstruction(opCode) + "i", loadedA, B);
 
             }
-            // This case causes issues with register allocation as it
-            // is possibly not needed for constants
-            else if (A.type == Kind.CONST && B.type == Kind.CONST) {
+                // This case causes issues with register allocation as it
+                // is possibly not needed for constants
+              else if (A.type == Kind.CONST && B.type == Kind.CONST) {
                 switch (opCode) {
                     case Token.TIMES:
-                        res.valueD = (double)(A.valueD * B.valueD);
+                        res.SetValue(Double.Parse(A.GetValue()) * Double.Parse(B.GetValue()));
                         break;
                     case Token.DIV:
-                        res.valueD = (double)(A.valueD / B.valueD);
+                        res.SetValue(Double.Parse(A.GetValue()) / Double.Parse(B.GetValue()));
                         break;
                     case Token.PLUS:
-                        res.valueD = (double)(A.valueD + B.valueD);
+                       res.SetValue(Double.Parse(A.GetValue()) + Double.Parse(B.GetValue()));
                         break;
                     case Token.MINUS:
-                        res.valueD = (double)(A.valueD - B.valueD);
+                    res.SetValue(Double.Parse(A.GetValue()) - Double.Parse(B.GetValue()));
                         break;
                 }
 
@@ -651,7 +672,7 @@ namespace ScannerParser {
 
 
         private void FuncDecl() {
-           
+
             if (scannerSym == Token.FUNC || scannerSym == Token.PROC) {
                 Next();
             } else {
@@ -741,12 +762,11 @@ namespace ScannerParser {
                 // todo, here we will need a branch to loop header
                 VerifyToken(Token.OD, "The while loop was not properly closed with the od keyword");
                 Next(); //eat od
-            }
-            else {
+            } else {
                 scanner.Error("The relation in the if did not contain a valid conditional operator");
             }
-            return new Result(); // todo, don't know what this should be either
-
+            //return new Result(); // todo, don't know what this should be either
+            return null;
         }
 
         private Result ReturnStatement() {
@@ -764,7 +784,6 @@ namespace ScannerParser {
             sw.WriteLine("RET ??");
             return null;
         }
-
 
 
         // TODO:: This would be the optimal place to create ID-->Variable Map
@@ -790,13 +809,13 @@ namespace ScannerParser {
                     Number();
                     VerifyToken(Token.CLOSEBRACKET, "Array declaraion missing ]");
                     Next();
-                   
-                   
+
+
                 } while (scannerSym != Token.IDENT);
 
                 VerifyToken(Token.IDENT, "Array declaration missing name");
                 Next(); // eat ident
-              
+
             }
 
             VerifyToken(Token.SEMI, "Missing semicolon at end of variable declaration");
@@ -808,8 +827,7 @@ namespace ScannerParser {
             // todo, implement outputNum, but we need way of knowing that it needs to be called
             if (r.type == Kind.REG) {
 
-            }
-            else {
+            } else {
                 Debug.WriteLine("OutputNum was not provided with a register as an argument, this is a parser error");
             }
         }
@@ -839,37 +857,12 @@ namespace ScannerParser {
             }
         }
 
-        // If you feed a Result to this, it will pull out the right value
-        private string ResolveResultValue(Result res) {
-            string s = null;
-            switch (res.type) {
-                case Kind.VAR:
-                    s = res.valueS;
-                    break;
-                case Kind.REG:
-                    s = res.regName;
-                    break;
-                case Kind.COND:
-                    s = res.regName;
-                    break;
-                case Kind.CONST:
-                    switch (res.constantType) {
-                        case ConstantType.DOUBLE:
-                            s = res.valueD.ToString();
-                            break;
-                        case ConstantType.STRING:
-                            s = res.valueS;
-                            break;
-                    }
-                    break;
-            }
-            return s;
-        }
+
 
         //private Result LoadVariable(Result r) {
         //    AllocateRegister();
-        //    sw.WriteLine("load R{1} {0}", r.valueS, currRegister);
-        //    Console.WriteLine("load R{1} {0}", r.valueS, currRegister);
+        //    sw.WriteLine("load R{1} {0}", r.GetValue(), currRegister);
+        //    Console.WriteLine("load R{1} {0}", r.GetValue(), currRegister);
         //    Result res = new Result();
         //    res.regNo = currRegister;
         //    res.type = Kind.REG;
@@ -882,15 +875,13 @@ namespace ScannerParser {
         private Result PutArithmeticRegInstruction(string opCode, Result a, Result b) {
 
             if (a.type == Kind.REG && b.type == Kind.REG)
-                PutF2(opCode, a.regName, b.regName);
+                PutF2(opCode, a.GetValue(), b.GetValue());
             else if (a.type == Kind.REG && b.type == Kind.VAR) {
-                PutF2(opCode, a.regName, b.valueS);
-            }
-            else if (a.type == Kind.VAR && b.type == Kind.REG) {
-                PutF2(opCode, a.valueS, b.regName);
-            }
-            else {
-                PutF2(opCode, a.valueS, b.valueS);
+                PutF2(opCode, a.GetValue(), b.GetValue());
+            } else if (a.type == Kind.VAR && b.type == Kind.REG) {
+                PutF2(opCode, a.GetValue(), b.GetValue());
+            } else {
+                PutF2(opCode, a.GetValue(), b.GetValue());
             }
 
             Result res = new Result(Kind.REG, String.Format("({0})", AssemblyPC));
@@ -905,17 +896,15 @@ namespace ScannerParser {
             opCode += "i";
 
             if (a.type == Kind.REG && b.constantType == ConstantType.DOUBLE)
-                PutF1(opCode, a.regName, b.valueD);
+                PutF1(opCode, a.GetValue(), b.GetValue());
             else if (a.type == Kind.REG && b.constantType == ConstantType.STRING) {
-                PutF1(opCode, a.regName, b.valueS);
+                PutF1(opCode, a.GetValue(), b.GetValue());
+            } else if (a.type == Kind.VAR && b.constantType == ConstantType.DOUBLE) {
+                PutF1(opCode, a.GetValue(), b.GetValue());
+            } else {
+                PutF1(opCode, a.GetValue(), b.GetValue());
             }
-            else if (a.type == Kind.VAR && b.constantType == ConstantType.DOUBLE) {
-                PutF1(opCode, a.valueS, b.valueD);
-            }
-            else {
-                PutF1(opCode, a.valueS, b.valueS);
-            }
-            
+
             Result res = new Result(Kind.REG, String.Format("({0})", AssemblyPC));
             AssemblyPC++;
             return res;
@@ -944,20 +933,20 @@ namespace ScannerParser {
             sw.WriteLine("{0} {1} {2} {3}", op, String.Format("({0})", AssemblyPC), a, b);
             Console.WriteLine("{0} {1} {2} {3}", op, String.Format("({0})", AssemblyPC), a, b);
             //if (b.type == Kind.CONST) {
-            //    sw.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.valueD);
-            //    Console.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.valueD);
+            //    sw.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.GetValue());
+            //    Console.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.GetValue());
 
             //}
             //else if (a.type == Kind.COND) {
             //    // todo, the value for the second parameter shouldn't be a string
             //    // it needs to be the offset, but don't know how to do that yet
-            //    sw.WriteLine("{0} {1} {2}", op, a.regNo, b.valueS);
-            //    Console.WriteLine("{0} {1} {2}", op, a.regNo, b.valueS);
+            //    sw.WriteLine("{0} {1} {2}", op, a.regNo, b.GetValue());
+            //    Console.WriteLine("{0} {1} {2}", op, a.regNo, b.GetValue());
             //}
             //else {
             //    Console.WriteLine("PutF1 paramters in wrong order.");
-            //    sw.WriteLine("{0} {1} {2} {3}", op, currRegister, b.regNo, a.valueD);
-            //    Console.WriteLine("{0} {1} {2} {3}", op, currRegister, b.regNo, a.valueD);
+            //    sw.WriteLine("{0} {1} {2} {3}", op, currRegister, b.regNo, a.GetValue());
+            //    Console.WriteLine("{0} {1} {2} {3}", op, currRegister, b.regNo, a.GetValue());
 
             //}
 

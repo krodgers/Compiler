@@ -17,5 +17,6 @@ namespace ScannerParser {
             blockNum = myNumber;
 
         }
-       
+
     }
+}
