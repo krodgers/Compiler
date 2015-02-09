@@ -37,6 +37,10 @@ namespace ScannerParser {
         private BasicBlock curBasicBlock;
         private int curBasicBlockNum;
         private Stack<BasicBlock> parentBlocks;
+        private Stack<int> scopes; // track the current scope
+        private int nextScopeNumber;
+        //   private Dictionary<Symbol, List<Symbol>> symbolTable; // indexed by function
+        private List<Symbol> symbolTable; // all the symbols!
 
         public Parser(String file) {
             scanner = new Scanner(file);
@@ -47,6 +51,9 @@ namespace ScannerParser {
             curBasicBlockNum = 1;
             curBasicBlock = null;
             parentBlocks = new Stack<BasicBlock>();
+            scopes = new Stack<int>();
+            symbolTable = new List<Symbol>();
+            nextScopeNumber = 1;
         }
 
         // Sets initial state of parser
@@ -262,16 +269,13 @@ namespace ScannerParser {
             return res;
         }
 
-        // TODO:: When storing/loading, need 
-        // ADDA Base_Ptr Array_Loc
-        // LOAD/STORE
         private Result MakeArrayReference(Result res) {
             // find dimensions of array -- > requires symbol table look up
             int[] arrDims = GetArrayDimensions(res.GetValue());
-            
+
             Result[] indexer = new Result[arrDims.Length];
 
-            
+
             for (int i = 0; i < arrDims.Length; i++) {
                 VerifyToken(Token.OPENBRACKET, "Array missing open bracket");
                 Next();
@@ -290,9 +294,13 @@ namespace ScannerParser {
         // TODO:: Handle Arrays correctly --> getting address when needed
 
         private int[] GetArrayDimensions(string arrayName) {
-
-
-            return new int[4];
+            Symbol currSym = symbolTable[scanner.String2Id(arrayName)];
+            if (currSym == null || !currSym.IsInScope(scopes.Peek())) {
+                scanner.Error(String.Format("{1}: Array {0} not in scope", arrayName, AssemblyPC));
+                return null;
+            }
+            return currSym.arrDims;
+            
         }
 
         // Returns result with the designator thing in a variable
@@ -300,6 +308,7 @@ namespace ScannerParser {
             Result res = null, expr = null;
             VerifyToken(Token.IDENT, "Ended up at Designator but didn't parse an identifier");
             res = Ident();
+         
             if (scannerSym == Token.OPENBRACKET) {
                 Next(); // eat [
 
@@ -309,12 +318,6 @@ namespace ScannerParser {
                 VerifyToken(Token.CLOSEBRACKET, "Designator: Unmatched [.... missing ]");
                 Next();
 
-
-                // todo, this is for array, need to change it but not yet
-
-                // res = new Result(Kind.REG, currRegister); // TODO:: Or a variable?
-                // res = new Result(Kind.CONST, ConstantType.ADDR, something);
-                res = new Result(Kind.VAR, res.GetValue());
             }
 
 
@@ -482,6 +485,10 @@ namespace ScannerParser {
             Result res = null;
             VerifyToken(Token.IDENT, "Ended up at Identifier but didn't parse an identifier");
             Next(); // eat the identifier
+
+            // make sure thing is in scope
+            if (!CheckScope(scanner.id)) return null;
+
             res = new Result(Kind.VAR, scanner.Id2String(scanner.id)); // changed to var for now to simulate output
             return res;
 
@@ -518,9 +525,7 @@ namespace ScannerParser {
 
                 // Needs to output a move instruction which for now will be done here,
                 // but maybe should be moved elsewhere
-                // Should the order be "opcode res1 res2" where res2 goes into res1?
-                PutF2("mov", res1.GetValue(), res2.GetValue());
-                //   PutF2("mov", ResolveResultValue(res2), ResolveResultValue(res1));
+                PutF2("mov", res2.GetValue(), res1.GetValue());
                 AssemblyPC++;
 
                 // TODO:: THis is wrong.  res1 and res2 may not be registers.  Should they be?
@@ -629,10 +634,10 @@ namespace ScannerParser {
                         res.SetValue(Double.Parse(A.GetValue()) / Double.Parse(B.GetValue()));
                         break;
                     case Token.PLUS:
-                       res.SetValue(Double.Parse(A.GetValue()) + Double.Parse(B.GetValue()));
+                        res.SetValue(Double.Parse(A.GetValue()) + Double.Parse(B.GetValue()));
                         break;
                     case Token.MINUS:
-                    res.SetValue(Double.Parse(A.GetValue()) - Double.Parse(B.GetValue()));
+                        res.SetValue(Double.Parse(A.GetValue()) - Double.Parse(B.GetValue()));
                         break;
                 }
 
@@ -646,6 +651,7 @@ namespace ScannerParser {
         private void Main() {
             if (VerifyToken(Token.MAIN, "Missing Main Function")) {// find "main"
                 Next();
+                scopes.Push(1);
                 while (scannerSym == Token.VAR | scannerSym == Token.ARR) { // variable declarations
                     VarDecl();
                 }
@@ -672,19 +678,24 @@ namespace ScannerParser {
 
 
         private void FuncDecl() {
-
+            Token funcType = scannerSym;
             if (scannerSym == Token.FUNC || scannerSym == Token.PROC) {
                 Next();
             } else {
                 scanner.Error("Function Declaration missing function/ procedure keyword");
             }
+            // new scope
+            scopes.Push(nextScopeNumber++);
             VerifyToken(Token.IDENT, "Function/Procedure declaration missing a name");
             Ident();
+            symbolTable.Add(new Symbol(funcType, scanner.id, AssemblyPC, scopes.Peek()));
+
             if (scannerSym == Token.OPENPAREN) {
                 Next(); // eat openParen
                 // Formal Parameter
                 if (scannerSym == Token.IDENT) {
                     Ident();
+                    symbolTable.Add(new Symbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek()));
                     while (scannerSym == Token.COMMA) {
                         Next();
                         Ident();
@@ -772,30 +783,39 @@ namespace ScannerParser {
         private Result ReturnStatement() {
             VerifyToken(Token.RETURN, "Missing return keyword");
             Next();
+            // find the last function symbol
+            Symbol curFunc = symbolTable.FindLast(delegate(Symbol s) { return s.type == Token.FUNC || s.type == Token.PROC; });
+            // current scope ends
+            scopes.Pop();
             Result res = null;
-            if (scannerSym == Token.IDENT) {
-                res = Expression();
+            if (curFunc.type == Token.FUNC) {
+                if (!(scannerSym == Token.IDENT || scannerSym == Token.NUMBER))
+                    scanner.Error("Function should return a value");
+                if (scannerSym == Token.IDENT) {
+                    res = Expression();
+                } else if (scannerSym == Token.NUMBER) {
+                    res = Number();
+                }
+                sw.WriteLine("ret {0}", res.GetValue());
             }
-
-            // TODO: How does function know where to return to?
-            // pop stack?
-            // restore frames?
-            // load return value into return register?
-            sw.WriteLine("RET ??");
+           
+            sw.WriteLine("ret");
             return null;
         }
 
 
-        // TODO:: This would be the optimal place to create ID-->Variable Map
+
         private void VarDecl() {
             if (scannerSym == Token.VAR) {
                 Next(); // eat "var"
                 VerifyToken(Token.IDENT, "Variable declaration missing variable name");
+                symbolTable.Add(new Symbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek()));
                 Next(); // eat the ident 
 
                 while (scannerSym == Token.COMMA) {
                     Next(); // eat the comma
                     VerifyToken(Token.IDENT, "Dangling comma in variable declaration");
+                    symbolTable.Add(new Symbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek()));
                     Next(); // eat the ident
 
                 }
@@ -803,10 +823,15 @@ namespace ScannerParser {
             }
             if (scannerSym == Token.ARR) {
                 Next(); // eat  "array"
+                List<int> dims = new List<int>();
+                Result res;
+
                 do {
                     VerifyToken(Token.OPENBRACKET, "Array declaration missing [");
                     Next(); // eat [
-                    Number();
+                    res = Number();
+
+                    dims.Add(Int32.Parse(res.GetValue()));
                     VerifyToken(Token.CLOSEBRACKET, "Array declaraion missing ]");
                     Next();
 
@@ -814,6 +839,7 @@ namespace ScannerParser {
                 } while (scannerSym != Token.IDENT);
 
                 VerifyToken(Token.IDENT, "Array declaration missing name");
+                symbolTable.Add(new Symbol(Token.ARR, scanner.id, AssemblyPC, dims.ToArray(), scopes.Peek()));
                 Next(); // eat ident
 
             }
@@ -952,6 +978,27 @@ namespace ScannerParser {
 
 
         }
+
+        // TODO:: When storing/loading, need 
+        // ADDA Base_Ptr Array_Loc
+        // LOAD/STORE
+        private void LoadArray(Result array) {
+            int[] dims = GetArrayDimensions(array.GetValue());
+            Result[] inds = array.arrIndices;
+            int addr = -1;
+            // i*numCols + j
+            for(int i = 0; i < inds.Length; i ++){
+                if(inds[i].type == Kind.CONST){
+                     addr = 4 * Int32.Parse(inds[i].GetValue());
+                }
+                
+            }
+            if(addr != -1)
+                sw.WriteLine("{0}: adda {1} {2}", AssemblyPC, array.GetValue(), addr);
+            
+            sw.WriteLine("load ({0})", AssemblyPC);
+            AssemblyPC += 2;
+        }
         private void AllocateRegister() {
             currRegister++;
         }
@@ -1025,6 +1072,17 @@ namespace ScannerParser {
             return true;
         }
 
+        // Verifies the identifier is indeed in scope
+        private bool CheckScope(int identID) {
+
+            if (identID == -1) {
+                Console.WriteLine("{0}: Identifier {1} doesn't exist", AssemblyPC, identID);
+                return false;
+            }
+            Symbol curSym = symbolTable[identID];
+            return curSym.IsInScope(scopes.Peek());
+
+        }
 
     }
 }

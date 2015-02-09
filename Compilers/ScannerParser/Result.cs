@@ -13,17 +13,17 @@ namespace ScannerParser {
 
         public Kind? type;
         public int lineNumber;
-
+        public CondOp? condition { private set; get; } // the condition operator, if this is a condition
+        public ConstantType? constantType { private set; get; }
+        public Result[] arrIndices { private set; get; }
+       
 
         private string regName;
-        public CondOp? condition { private set;  get; } // the condition operator, if this is a condition
-        public ConstantType? constantType { private set;   get; }
         private int fixUpLoc;
         private double valueD; // value of constant
         private string valueS; // value of constant or the variable name
         private bool valueB; // value of evaluatable conditional
         private string arrBase;
-        private Result[] arrIndices;
         private int arrAddr;
         
 
@@ -133,6 +133,9 @@ namespace ScannerParser {
                             s = valueS;
                             break;
                     }
+                    break;
+                case Kind.ARR:
+                    s = arrBase;
                     break;
             }
             return s;

@@ -253,7 +253,7 @@ namespace ScannerParser
                 res = Token.OUTPUTNEWLINE;
             else {
                 res = Token.IDENT;
-                AddIdent(word + PC);
+                AddIdent(word);
             }
             return res;
         }
