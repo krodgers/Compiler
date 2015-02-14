@@ -75,8 +75,9 @@ namespace ScannerParser
                     case '*':
                         res = Token.TIMES;
                         break;
+                    case '#':
                     case '/':
-                        if (input.Peek() == '/')
+                        if (input.Peek() == '/' || currChar == '#')
                         {
                             input.ReadLine(); // is a comment and the line should be skipped
                             PC++; // count the comment line

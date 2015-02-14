@@ -6,12 +6,12 @@ using System.Threading.Tasks;
 
 namespace ScannerParser {
 
-    class Symbol {
+    public class Symbol {
 
         public Token type; // what this symbol is, VAR, FUNC, PROC, ARR ...
         public int currLineNumber {  set; get; } // the last line number this variable seen on
         public int identID { private set; get; }
-        public int[] arrDims { private set; get; } // for if it's an array
+        private int[] arrDims;// for if it's an array
 
         private List<int> validScope;
 
@@ -45,6 +45,22 @@ namespace ScannerParser {
 
         public int GetMyScope() {
             return validScope.Last<int>();
+        }
+        // Returns true if this symbol is a global symbol
+        // i.e. is declared right under main
+        public bool IsGlobal() {
+            return validScope.Contains(1);
+        }
+        
+        // If it's an array, returns the dimensions
+        // returns an empty array otherwise
+        public int[] GetArrayDimensions() {
+            if (type == Token.ARR) {
+                return arrDims;
+            } else {
+                return new int[0];
+            }
+
         }
 
 

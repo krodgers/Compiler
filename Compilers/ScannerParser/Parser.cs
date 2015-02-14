@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+// TODO:: we're going to have to add some accessors for the next steps
 namespace ScannerParser {
     public enum Token {
         ERROR = 0, TIMES = 1, DIV = 2,
@@ -25,7 +26,6 @@ namespace ScannerParser {
         ARITHMETIC_REG = 0, ARITHMETIC_IMM, MEM_ACCESS, CONTROL, COMPARE, ERROR
     };
 
-    // TODO:: Where should we catch undeclared identifiers?
     public class Parser {
         private Token scannerSym; // current token on input
         private Scanner scanner;
@@ -35,12 +35,12 @@ namespace ScannerParser {
         private int AssemblyPC;
         private BasicBlock rootBasicBlock;
         private BasicBlock curBasicBlock;
-        private int curBasicBlockNum;
+        private int nextBBid; // next available basic block id
         private Stack<BasicBlock> parentBlocks;
         private Stack<int> scopes; // track the current scope
-        private int nextScopeNumber;
+        private int nextScopeNumber; // next assignable scope number
         //   private Dictionary<Symbol, List<Symbol>> symbolTable; // indexed by function
-        private List<Symbol> symbolTable; // all the symbols!
+        private List<Symbol> symbolTable; // all the symbols! // indexed 
 
         public Parser(String file) {
             scanner = new Scanner(file);
@@ -48,12 +48,12 @@ namespace ScannerParser {
             sw = new StreamWriter(fs);
             Init();
             AssemblyPC = 1;
-            curBasicBlockNum = 1;
+            nextBBid = 1;
             curBasicBlock = null;
             parentBlocks = new Stack<BasicBlock>();
             scopes = new Stack<int>();
             symbolTable = new List<Symbol>();
-            nextScopeNumber = 1;
+            nextScopeNumber = 2;
         }
 
         // Sets initial state of parser
@@ -63,10 +63,15 @@ namespace ScannerParser {
         }
 
         ~Parser() {
-            if (sw != null)
-                sw.Close();
-            if (fs != null)
-                fs.Close();
+            try {
+                if (sw != null)
+                    sw.Close();
+                if (fs != null)
+                    fs.Close();
+            } catch(Exception){
+                Console.WriteLine("File may not be closed properly....");
+            }
+            
         }
 
         private void Next() {
@@ -75,7 +80,7 @@ namespace ScannerParser {
         }
 
         public void StartFirstPass() {
-            rootBasicBlock = new BasicBlock(curBasicBlockNum++);
+            rootBasicBlock = new BasicBlock(nextBBid++);
             rootBasicBlock.childBlocks = new List<BasicBlock>();
             curBasicBlock = rootBasicBlock;
             Main();
@@ -299,7 +304,7 @@ namespace ScannerParser {
                 scanner.Error(String.Format("{1}: Array {0} not in scope", arrayName, AssemblyPC));
                 return null;
             }
-            return currSym.arrDims;
+            return currSym.GetArrayDimensions();
             
         }
 
@@ -380,7 +385,10 @@ namespace ScannerParser {
                     Next(); // eat (
                     VerifyToken(Token.CLOSEPAREN, "Called OutputNewLine, missing )");
                     Next(); // eat )
-                    sw.WriteLine("WRL");
+                    //sw.WriteLine("WRL");
+                    sw.WriteLine("writeNL");
+                    Console.WriteLine("writeNL");
+
                     break;
 
                 case Token.OUTPUTNUM:
@@ -392,7 +400,9 @@ namespace ScannerParser {
                         res = FuncCall();
                     else if (scannerSym == Token.NUMBER || scannerSym == Token.IDENT)
                         res = Expression();
-                    sw.WriteLine("WRD " + res.GetValue());
+                    //sw.WriteLine("WRD " + res.GetValue());
+                    sw.WriteLine("write " + res.GetValue());
+                    Console.WriteLine("write " + res.GetValue());
 
                     VerifyToken(Token.CLOSEPAREN, "OutputNum missing )");
                     Next(); // eat )
@@ -445,7 +455,7 @@ namespace ScannerParser {
 
                         Next();
                         parentBlocks.Push(curBasicBlock);
-                        BasicBlock ifBlock = new BasicBlock(curBasicBlockNum++);
+                        BasicBlock ifBlock = new BasicBlock(nextBBid++);
                         ifBlock.childBlocks = new List<BasicBlock>();
                         ifBlock.parentBlocks.Add(curBasicBlock);
                         // I don't know what this is doing....
@@ -456,7 +466,7 @@ namespace ScannerParser {
 
                         if (scannerSym == Token.ELSE) {
                             parentBlocks.Push(curBasicBlock);
-                            BasicBlock elseBlock = new BasicBlock(curBasicBlockNum++);
+                            BasicBlock elseBlock = new BasicBlock(nextBBid++);
                             elseBlock.childBlocks = new List<BasicBlock>();
                             elseBlock.parentBlocks.Add(curBasicBlock);
                             //  elseBlock.parentBlock.childBlocks.Add(elseBlock);

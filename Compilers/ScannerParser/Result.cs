@@ -18,6 +18,7 @@ namespace ScannerParser {
         public Result[] arrIndices { private set; get; }
        
 
+
         private string regName;
         private int fixUpLoc;
         private double valueD; // value of constant
@@ -25,7 +26,7 @@ namespace ScannerParser {
         private bool valueB; // value of evaluatable conditional
         private string arrBase;
         private int arrAddr;
-        
+        private Instruction whereICameFrom; // the instruction that generated this result
 
 
         // Constructors

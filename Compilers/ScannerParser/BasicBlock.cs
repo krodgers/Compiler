@@ -11,8 +11,7 @@ namespace ScannerParser {
         public BasicBlock dominatingBlock; // 
         public List<BasicBlock> parentBlocks;
         public List<BasicBlock> childBlocks;  // block(s) with the instructions that follow this block's
-
-
+        
         public BasicBlock(int myNumber) {
             blockNum = myNumber;
 
