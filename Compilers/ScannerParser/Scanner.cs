@@ -255,7 +255,7 @@ namespace ScannerParser
             else {
                 res = Token.IDENT;
                 AddIdent(word);
-            }
+           }
             return res;
         }
 
@@ -267,7 +267,7 @@ namespace ScannerParser
             if (idx == -1)
             {
                 identifiers.Add(newIdent);
-                id = identifiers.Count -1;
+                id = identifiers.Count - 1; 
                 
             } else {
                 id = idx;

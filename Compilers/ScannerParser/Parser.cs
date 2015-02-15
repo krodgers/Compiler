@@ -1,4 +1,5 @@
-﻿﻿using System;
+﻿﻿
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -60,6 +61,7 @@ namespace ScannerParser {
         // for now
         private void Init() {
             Next(); // set first symbol
+
         }
 
         ~Parser() {
@@ -68,10 +70,10 @@ namespace ScannerParser {
                     sw.Close();
                 if (fs != null)
                     fs.Close();
-            } catch(Exception){
+            } catch (Exception) {
                 Console.WriteLine("File may not be closed properly....");
             }
-            
+
         }
 
         private void Next() {
@@ -83,6 +85,7 @@ namespace ScannerParser {
             rootBasicBlock = new BasicBlock(nextBBid++);
             rootBasicBlock.childBlocks = new List<BasicBlock>();
             curBasicBlock = rootBasicBlock;
+
             Main();
         }
 
@@ -211,6 +214,8 @@ namespace ScannerParser {
             Result res2;
             Token opCode;
             res = Term();
+            if (res == null)
+                Console.WriteLine("{0}: Got null res", AssemblyPC);
             while (scannerSym == Token.PLUS || scannerSym == Token.MINUS) {
                 opCode = scannerSym == Token.PLUS ? Token.PLUS : Token.MINUS;
                 Next();
@@ -230,6 +235,9 @@ namespace ScannerParser {
             Result res = null, resB = null;
             if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER || scannerSym == Token.OPENPAREN || scannerSym == Token.CALL) {
                 res = Factor(); // will end on next token
+                if (res == null)
+                    Console.WriteLine("{0}: Got null res");
+
                 while (scannerSym == Token.TIMES || scannerSym == Token.DIV) {
                     Token tmp = scannerSym;
                     Next();
@@ -252,12 +260,16 @@ namespace ScannerParser {
             Result res = null;
             if (scannerSym == Token.IDENT) {
                 res = Designator();
+                if (res == null)
+                    Console.WriteLine("{0}: Got null res", AssemblyPC);
+
             } else if (scannerSym == Token.NUMBER) {
                 res = new Result(Kind.CONST, Number().GetValue());
 
-            } else if (scannerSym == Token.FUNC) {
-                // TODO:: Function things
-                res = null;
+            } else if (scannerSym == Token.CALL) {
+                // TODO:: where to put the result of a function call?
+                res = FuncCall();
+
             } else if (scannerSym == Token.OPENPAREN) {
                 Next();
                 res = Expression();
@@ -305,7 +317,7 @@ namespace ScannerParser {
                 return null;
             }
             return currSym.GetArrayDimensions();
-            
+
         }
 
         // Returns result with the designator thing in a variable
@@ -313,7 +325,9 @@ namespace ScannerParser {
             Result res = null, expr = null;
             VerifyToken(Token.IDENT, "Ended up at Designator but didn't parse an identifier");
             res = Ident();
-         
+            if (res == null)
+                Console.WriteLine("{0}: Got null res", AssemblyPC);
+
             if (scannerSym == Token.OPENBRACKET) {
                 Next(); // eat [
 
@@ -349,33 +363,63 @@ namespace ScannerParser {
             switch (scannerSym) {
                 case Token.IDENT:
                     res = Ident();
-                    if (scannerSym == Token.OPENPAREN) {
-                        Next();
-                        if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER) {
-                            optionalArguments = new List<Result>();
-                            optionalArguments.Add(Expression());
-                        } else {
-                            Next();
-                        }
-                        // TODO code that handles expression in parentheses or another function
 
-                        while (scannerSym == Token.COMMA) {
+                    // Verify function is in scope
+                    if (CheckScope(scanner.String2Id(res.GetValue()))) {
+
+                        if (scannerSym == Token.OPENPAREN) {
                             Next();
-                            if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER ||
-                                scannerSym == Token.OPENPAREN || scannerSym == Token.CALL) {
+                            if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER) {
+                                optionalArguments = new List<Result>();
                                 optionalArguments.Add(Expression());
                             } else {
-                                scanner.Error("Ended up in optional arguments of function call and didn't parse a number, variable, comma, or expression");
+                                Next();
                             }
+                            // TODO code that handles expression in parentheses or another function
+
+                            while (scannerSym == Token.COMMA) {
+                                Next();
+                                if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER ||
+                                scannerSym == Token.OPENPAREN || scannerSym == Token.CALL) {
+                                    optionalArguments.Add(Expression());
+                                } else {
+                                    scanner.Error("Ended up in optional arguments of function call and didn't parse a number, variable, comma, or expression");
+                                }
+                            }
+
+
+                            VerifyToken(Token.CLOSEPAREN, "Ended up in arguments of function call and didn't parse a number, variable, comma, or expression");
+                            Next();
+                            // Combine ALL THE THINGS! -- I don't know how to do this, how does
+                            // passing arguments to function work in assembly?! BWAAAAHHHH!
+
                         }
 
 
-                        VerifyToken(Token.CLOSEPAREN, "Ended up in arguments of function call and didn't parse a number, variable, comma, or expression");
-                        Next();
-                        // Combine ALL THE THINGS! -- I don't know how to do this, how does
-                        // passing arguments to function work in assembly?! BWAAAAHHHH!
+                        // TODO:: 
+                        // load up the function parameters
+                        // save return address
+                        // save any needed registers
+
+                        // BUT for now:
+                        sw.Write("call {0}", res.GetValue());
+
+                        Console.Write("call {0} (", res.GetValue());
+                        foreach (Result r in optionalArguments) {
+                            sw.Write("{0}, ", r.GetValue());
+                            Console.Write("{0}, ", r.GetValue());
+                        }
+                        sw.Write(")\n");
+                        Console.Write(")\n");
+
+                        if (symbolTable[scanner.String2Id(res.GetValue())].type == Token.FUNC) {
+                            res = new Result(Kind.REG, "EAX"); // going to call return register EAX
+                        }
+                    } else {
+                        scanner.Error(String.Format("Tried to call an undefined function : {0}", res.GetValue()));
                     }
-                    // TODO:: Verify the function being called is defined/ in scope
+
+                    
                     break;
 
                 case Token.OUTPUTNEWLINE:
@@ -413,7 +457,9 @@ namespace ScannerParser {
                 case Token.INPUTNUM:
                     Next(); // eat InputNum
                     VerifyToken(Token.OPENPAREN, "InputNum missing (");
+                    Next(); // eat (
                     VerifyToken(Token.CLOSEPAREN, "InputNum has too many arguments or is missing )");
+                    Next(); // eat ) 
                     AllocateRegister();
                     res = new Result(Kind.REG, currRegister);
                     //sw.WriteLine("RDD {0}", res.regNo);
@@ -425,8 +471,8 @@ namespace ScannerParser {
 
             }
 
-            if (scannerSym == Token.SEMI)
-                Next(); // eat the semicolon
+            //if (scannerSym == Token.SEMI)
+              //  Next(); // eat the semicolon // if semi exists, means there's another statement coming
 
 
             // TODO:: What to return here if the function doesn't return anything?
@@ -494,12 +540,11 @@ namespace ScannerParser {
         private Result Ident() {
             Result res = null;
             VerifyToken(Token.IDENT, "Ended up at Identifier but didn't parse an identifier");
-            Next(); // eat the identifier
-
             // make sure thing is in scope
             if (!CheckScope(scanner.id)) return null;
-
+         
             res = new Result(Kind.VAR, scanner.Id2String(scanner.id)); // changed to var for now to simulate output
+            Next(); // eat the identifier
             return res;
 
         }
@@ -671,6 +716,7 @@ namespace ScannerParser {
 
                 // start program
                 if (VerifyToken(Token.BEGIN, "Missing Opening bracket of program")) {
+
                     Next();
                     StatSequence();
                 }
@@ -694,26 +740,44 @@ namespace ScannerParser {
             } else {
                 scanner.Error("Function Declaration missing function/ procedure keyword");
             }
-            // new scope
-            scopes.Push(nextScopeNumber++);
-            VerifyToken(Token.IDENT, "Function/Procedure declaration missing a name");
-            Ident();
-            symbolTable.Add(new Symbol(funcType, scanner.id, AssemblyPC, scopes.Peek()));
 
+            VerifyToken(Token.IDENT, "Function/Procedure declaration missing a name");
+            
+            Symbol function;
+            if (scopes.Peek() == 1) { // function is in global scope as well as local scope
+                function = new Symbol(funcType, scanner.id, AssemblyPC, scopes.Peek());
+                scopes.Push(nextScopeNumber++);
+                // function should be able to be called from anywhere
+                function.AddScope(scopes.Peek());
+            } else {
+                scopes.Push(nextScopeNumber++);
+                function = new Symbol(funcType, scanner.id, AssemblyPC, scopes.Peek());
+            }
+            AddToSymbolTable(function, scopes.Peek());
+
+            Next(); // eat ident
+            
             if (scannerSym == Token.OPENPAREN) {
                 Next(); // eat openParen
                 // Formal Parameter
                 if (scannerSym == Token.IDENT) {
-                    Ident();
-                    symbolTable.Add(new Symbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek()));
+                    //                    Ident();
+                    Next(); // eat ident
+                    AddToSymbolTable(new Symbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek()), scopes.Peek());
+
                     while (scannerSym == Token.COMMA) {
                         Next();
-                        Ident();
+                        //                      Ident();
+                        Next(); // eat Ident
+                        AddToSymbolTable(new Symbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek()), scopes.Peek());
+
                     }
                 }
                 VerifyToken(Token.CLOSEPAREN, "Function Declaration missing a closing parenthesis");
                 Next(); // eat closeparen
             }
+
+
             VerifyToken(Token.SEMI, "Function Declaration missing a semicolon");
             Next(); // eat semi
             // Func Body
@@ -793,24 +857,31 @@ namespace ScannerParser {
         private Result ReturnStatement() {
             VerifyToken(Token.RETURN, "Missing return keyword");
             Next();
-            // find the last function symbol
-            Symbol curFunc = symbolTable.FindLast(delegate(Symbol s) { return s.type == Token.FUNC || s.type == Token.PROC; });
-            // current scope ends
-            scopes.Pop();
+            //todo:: check if return expression necessary 
+
             Result res = null;
-            if (curFunc.type == Token.FUNC) {
-                if (!(scannerSym == Token.IDENT || scannerSym == Token.NUMBER))
-                    scanner.Error("Function should return a value");
-                if (scannerSym == Token.IDENT) {
-                    res = Expression();
-                } else if (scannerSym == Token.NUMBER) {
-                    res = Number();
-                }
+            // if (curFunc.type == Token.FUNC) {
+            // if (!(scannerSym == Token.IDENT || scannerSym == Token.NUMBER))
+            //    scanner.Error("Function should return a value");
+            if (scannerSym != Token.END) {
+
+                res = Expression();
+                if (res == null)
+                    Console.WriteLine("{0}: Got null res");
+
                 sw.WriteLine("ret {0}", res.GetValue());
+                // current scope ends
+                scopes.Pop();
+                return res;
+
+            } else {
+                //     }
+
+                sw.WriteLine("ret");
+                // current scope ends
+                scopes.Pop();
+                return null;
             }
-           
-            sw.WriteLine("ret");
-            return null;
         }
 
 
@@ -819,13 +890,15 @@ namespace ScannerParser {
             if (scannerSym == Token.VAR) {
                 Next(); // eat "var"
                 VerifyToken(Token.IDENT, "Variable declaration missing variable name");
-                symbolTable.Add(new Symbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek()));
+                AddToSymbolTable(new Symbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek()), scopes.Peek());
+
                 Next(); // eat the ident 
 
                 while (scannerSym == Token.COMMA) {
                     Next(); // eat the comma
                     VerifyToken(Token.IDENT, "Dangling comma in variable declaration");
-                    symbolTable.Add(new Symbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek()));
+                    AddToSymbolTable(new Symbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek()), scopes.Peek());
+
                     Next(); // eat the ident
 
                 }
@@ -849,7 +922,8 @@ namespace ScannerParser {
                 } while (scannerSym != Token.IDENT);
 
                 VerifyToken(Token.IDENT, "Array declaration missing name");
-                symbolTable.Add(new Symbol(Token.ARR, scanner.id, AssemblyPC, dims.ToArray(), scopes.Peek()));
+                AddToSymbolTable(new Symbol(Token.ARR, scanner.id, AssemblyPC, dims.ToArray(), scopes.Peek()), scopes.Peek());
+
                 Next(); // eat ident
 
             }
@@ -997,15 +1071,15 @@ namespace ScannerParser {
             Result[] inds = array.arrIndices;
             int addr = -1;
             // i*numCols + j
-            for(int i = 0; i < inds.Length; i ++){
-                if(inds[i].type == Kind.CONST){
-                     addr = 4 * Int32.Parse(inds[i].GetValue());
+            for (int i = 0; i < inds.Length; i++) {
+                if (inds[i].type == Kind.CONST) {
+                    addr = 4 * Int32.Parse(inds[i].GetValue());
                 }
-                
+
             }
-            if(addr != -1)
+            if (addr != -1)
                 sw.WriteLine("{0}: adda {1} {2}", AssemblyPC, array.GetValue(), addr);
-            
+
             sw.WriteLine("load ({0})", AssemblyPC);
             AssemblyPC += 2;
         }
@@ -1092,6 +1166,18 @@ namespace ScannerParser {
             Symbol curSym = symbolTable[identID];
             return curSym.IsInScope(scopes.Peek());
 
+        }
+
+        // Adds the symbol to the symbol table, if its ID is unique
+        // else, adds the scope to the symbol
+        private void AddToSymbolTable(Symbol s, int scope) {
+
+            if (s.identID < symbolTable.Count && symbolTable[s.identID] != null) {
+                // already have a symbol with this name
+                symbolTable[s.identID].AddScope(scope);
+            } else {
+                symbolTable.Insert(scanner.id, s);
+            }
         }
 
     }

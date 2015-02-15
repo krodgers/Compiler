@@ -9,7 +9,7 @@ namespace ScannerParser {
     public enum CondOp { GT, LT, LEQ, GEQ, EQ, NEQ, ERR };
     public enum ConstantType { STRING, INT, DOUBLE, BOOLEAN, ADDR};
 
-    class Result {
+  public  class Result {
 
         public Kind? type;
         public int lineNumber;
