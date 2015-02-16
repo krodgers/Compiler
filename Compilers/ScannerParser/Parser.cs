@@ -516,7 +516,7 @@ namespace ScannerParser {
                         //BasicBlock joinBlock = new BasicBlock(curBasicBlockNum++);
 
                         bool elseOccurred = false;
-                        BasicBlock joinBlock = new BasicBlock(curBasicBlockNum++);
+                        BasicBlock joinBlock = new BasicBlock(nextBBid++);
                         flowGraphNodes[joinBlock.blockNum] = joinBlock;
                         joinBlock.childBlocks = new List<BasicBlock>();
                         joinBlock.parentBlocks = new List<BasicBlock>();
