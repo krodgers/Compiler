@@ -38,10 +38,17 @@ namespace ScannerParser {
         private BasicBlock curBasicBlock;
         private int nextBBid; // next available basic block id
         private Stack<BasicBlock> parentBlocks;
+
         private Stack<int> scopes; // track the current scope
         private int nextScopeNumber; // next assignable scope number
         //   private Dictionary<Symbol, List<Symbol>> symbolTable; // indexed by function
         private List<Symbol> symbolTable; // all the symbols! // indexed 
+
+        private Stack<BasicBlock> joinBlocks;
+        private int globalNestingLevel;
+        BasicBlock trueBlock, falseBlock, joinBlock;
+        Dictionary<int, BasicBlock> flowGraphNodes;
+
 
         public Parser(String file) {
             scanner = new Scanner(file);
@@ -52,9 +59,15 @@ namespace ScannerParser {
             nextBBid = 1;
             curBasicBlock = null;
             parentBlocks = new Stack<BasicBlock>();
+
             scopes = new Stack<int>();
             symbolTable = new List<Symbol>();
             nextScopeNumber = 2;
+
+            joinBlocks = new Stack<BasicBlock>();
+            globalNestingLevel = 0;
+            trueBlock = falseBlock = joinBlock = null;
+            flowGraphNodes = new Dictionary<int, BasicBlock>();
         }
 
         // Sets initial state of parser
@@ -83,7 +96,10 @@ namespace ScannerParser {
 
         public void StartFirstPass() {
             rootBasicBlock = new BasicBlock(nextBBid++);
+            flowGraphNodes[rootBasicBlock.blockNum] = rootBasicBlock;
             rootBasicBlock.childBlocks = new List<BasicBlock>();
+            rootBasicBlock.parentBlocks = new List<BasicBlock>();
+            rootBasicBlock.nestingLevel = globalNestingLevel;
             curBasicBlock = rootBasicBlock;
 
             Main();
@@ -480,6 +496,7 @@ namespace ScannerParser {
         }
 
         private Result IfStatement() {
+            
             Result res = null;
             if (scannerSym == Token.IF) {
                 Next();
@@ -498,29 +515,76 @@ namespace ScannerParser {
                         // First create the join block
                         //BasicBlock joinBlock = new BasicBlock(curBasicBlockNum++);
 
+                        bool elseOccurred = false;
+                        BasicBlock joinBlock = new BasicBlock(curBasicBlockNum++);
+                        flowGraphNodes[joinBlock.blockNum] = joinBlock;
+                        joinBlock.childBlocks = new List<BasicBlock>();
+                        joinBlock.parentBlocks = new List<BasicBlock>();
+                        joinBlock.nestingLevel = globalNestingLevel;
+                        joinBlocks.Push(joinBlock);
+
+                        globalNestingLevel++;
 
                         Next();
                         parentBlocks.Push(curBasicBlock);
-                        BasicBlock ifBlock = new BasicBlock(nextBBid++);
-                        ifBlock.childBlocks = new List<BasicBlock>();
-                        ifBlock.parentBlocks.Add(curBasicBlock);
-                        // I don't know what this is doing....
-                        //  ifBlock.parentBlocks.childBlocks.Add(ifBlock);
-                        curBasicBlock = ifBlock;
+                        BasicBlock trueBlock = new BasicBlock(nextBBid++);
+                        flowGraphNodes[trueBlock.blockNum] = trueBlock;
+                        trueBlock.childBlocks = new List<BasicBlock>();
+                        trueBlock.parentBlocks = new List<BasicBlock>();
+                        trueBlock.parentBlocks.Add(curBasicBlock);
+                        //trueBlock.childBlocks.Add(joinBlock);
+                        trueBlock.nestingLevel = globalNestingLevel;
+                        curBasicBlock.childBlocks.Add(trueBlock);
+                        curBasicBlock = trueBlock;
                         StatSequence();
                         curBasicBlock = parentBlocks.Pop();
 
+                        BasicBlock falseBlock = null;
                         if (scannerSym == Token.ELSE) {
                             parentBlocks.Push(curBasicBlock);
-                            BasicBlock elseBlock = new BasicBlock(nextBBid++);
-                            elseBlock.childBlocks = new List<BasicBlock>();
-                            elseBlock.parentBlocks.Add(curBasicBlock);
-                            //  elseBlock.parentBlock.childBlocks.Add(elseBlock);
-                            curBasicBlock = elseBlock;
+                            falseBlock = new BasicBlock(nextBBid++);
+                            flowGraphNodes[falseBlock.blockNum] = falseBlock;
+                            falseBlock.childBlocks = new List<BasicBlock>();
+                            falseBlock.parentBlocks = new List<BasicBlock>();
+                            falseBlock.parentBlocks.Add(curBasicBlock);
+                            falseBlock.nestingLevel = globalNestingLevel;
+                            curBasicBlock.childBlocks.Add(falseBlock);
+                            curBasicBlock = falseBlock;
                             Next();
                             StatSequence();
                             curBasicBlock = parentBlocks.Pop();
-                        } else if (scannerSym == Token.FI) {
+                            elseOccurred = true;
+                        }
+                        if (scannerSym == Token.FI) {
+                            if (!elseOccurred) {
+                                curBasicBlock.childBlocks.Add(joinBlock);
+                                joinBlock.parentBlocks.Add(curBasicBlock);
+                                if (trueBlock.childBlocks.Count == 0) {
+                                    trueBlock.childBlocks.Add(joinBlock);
+                                    joinBlock.parentBlocks.Add(trueBlock);
+                                }
+                            }
+                            else {
+                                if (curBasicBlock.childBlocks.Count < 2) {
+                                    curBasicBlock.childBlocks.Add(joinBlock);
+                                    joinBlock.parentBlocks.Add(curBasicBlock);
+                                }
+                                if (trueBlock.childBlocks.Count == 0) {
+                                    trueBlock.childBlocks.Add(joinBlock);
+                                    joinBlock.parentBlocks.Add(trueBlock);
+                                }
+                                if (falseBlock.childBlocks.Count == 0) {
+                                    falseBlock.childBlocks.Add(joinBlock);
+                                    joinBlock.parentBlocks.Add(falseBlock);
+                                }
+                            }
+                            curBasicBlock = joinBlock;
+                            while (joinBlocks.Peek().blockNum > joinBlock.blockNum) {
+                                BasicBlock tmp = joinBlocks.Pop();
+                                tmp.childBlocks.Add(joinBlock);
+                                joinBlock.parentBlocks.Add(tmp);
+                            }
+                            globalNestingLevel--;
                             Next();
                         } else {
                             scanner.Error("In the if statement and found no token that matches either an else or a then");
@@ -815,6 +879,8 @@ namespace ScannerParser {
                     res = FuncCall();
                     break;
                 case Token.IF:
+                case Token.ELSE:
+                case Token.FI:
                     res = IfStatement();
                     break;
                 case Token.WHILE:
