@@ -42,7 +42,7 @@ namespace ScannerParser {
         private Stack<int> scopes; // track the current scope
         private int nextScopeNumber; // next assignable scope number
         //   private Dictionary<Symbol, List<Symbol>> symbolTable; // indexed by function
-        private List<Symbol> symbolTable; // all the symbols! // indexed 
+        private List<Symbol> symbolTable; // all the symbols! // indexed by symbol id
 
         private Stack<BasicBlock> joinBlocks;
         private int globalNestingLevel;
@@ -368,7 +368,50 @@ namespace ScannerParser {
             return res;
         }
 
+// TODO: Function things
+// Generates the code that should happen upon entering a function
+// I don't know know where/if we want to call it right now
+        private void FunctionEntryCode(int numLocals) {
+            Result SP = new Result(Kind.REG, "$SP");
+            Result FP = new Result(Kind.REG, "$FP");
+            Result PC = new Result(Kind.REG, "$PC");
+Result currRes;
+            // SSA form
+            // push return address
+            Result newSP = Combine(Token.MINUS, new Result(Kind.CONST, 4), SP); // push stack down
+            currRes =  Combine(Token.PLUS, PC, new Result(Kind.CONST, 4)); // compute return address
+            Store(currRes, newSP);
+            // push current FP
+            newSP = Combine(Token.MINUS, new Result(Kind.CONST, 4), newSP); // push stack down
+            Store(FP, newSP);
 
+            // push callee save registers // Can we get away with making the caller push all needed registers?
+            // set fp = sp - 4*numLocals
+
+            // set sp = fp
+
+// DLX form
+            // push return address
+            // push current FP
+            // push callee save registers // Can we get away with making the caller push all needed registers?
+            // set fp = sp - 4*numLocals
+            // set sp = fp
+
+
+
+        }
+
+// Generates the code that should happen upon exiting a function
+// I don't know know where/if we want to call it right now
+        private void FunctionExitCode(int numLocals, Result returnValue) {
+            // Put ret val in ret reg
+            // reset stackpointer: SP = FP + 4*numLocals
+            // pop callee save registers
+            // pop/restore FP
+
+            // pop return address into $ra
+// return to caller --> jump $ra
+        }
         private Result FuncCall() {
             Result res = null;
             List<Result> optionalArguments = null;
@@ -1034,16 +1077,29 @@ namespace ScannerParser {
         }
 
 
+        // We need this
+        // TODO:: Make LoadVariable Correct
+        private Result LoadVariable(Result r) {
+            AllocateRegister();
+            sw.WriteLine("load R{1} {0}", r.GetValue(), currRegister);
+            Console.WriteLine("load R{1} {0}", r.GetValue(), currRegister);
+            Result res = new Result(Kind.REG, currRegister);
+            return res;
+        }
 
-        //private Result LoadVariable(Result r) {
-        //    AllocateRegister();
-        //    sw.WriteLine("load R{1} {0}", r.GetValue(), currRegister);
-        //    Console.WriteLine("load R{1} {0}", r.GetValue(), currRegister);
-        //    Result res = new Result();
-        //    res.regNo = currRegister;
-        //    res.type = Kind.REG;
-        //    return res;
-        //}
+        // Stores thingtoStore at whereToStore
+        // whereToStore must be a register
+        private void Store(Result thingToStore, Result whereToStore) {
+            if (whereToStore.type == Kind.REG) {
+                sw.WriteLine("store R{1} {0}", thingToStore.GetValue(), whereToStore.GetValue());
+                Console.WriteLine("store R{1} {0}", thingToStore.GetValue(), whereToStore.GetValue());
+              
+            } else {
+                Console.WriteLine("WARNING: Attempting to store in something that isn't a register");
+            }
+
+            
+        }
 
         // This function puts an arithmetic instruction where all arguments are registers
         // or variables (but will need to only be registers in the final output, but this
@@ -1244,6 +1300,17 @@ namespace ScannerParser {
             } else {
                 symbolTable.Insert(scanner.id, s);
             }
+        }
+
+        // Call when we want to keep compiling after an error
+// Scans until we hit the next line of the file
+        private void AbortLine() {
+            int currPC = scanner.PC;
+            while (scanner.PC == currPC) {
+                Next();
+            }
+
+
         }
 
     }
