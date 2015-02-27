@@ -44,6 +44,7 @@ namespace ScannerParser {
         private List<Symbol> symbolTable; // all the symbols! // indexed by symbol id
 
         private Stack<BasicBlock> joinBlocks;
+        private Stack<BasicBlock> loopHeaderBlocks; 
         private int globalNestingLevel;
         BasicBlock trueBlock, falseBlock, joinBlock;
         Dictionary<int, BasicBlock> flowGraphNodes;
@@ -64,6 +65,8 @@ namespace ScannerParser {
             nextScopeNumber = 2;
 
             joinBlocks = new Stack<BasicBlock>();
+            loopHeaderBlocks = new Stack<BasicBlock>();
+            
             globalNestingLevel = 0;
             trueBlock = falseBlock = joinBlock = null;
             flowGraphNodes = new Dictionary<int, BasicBlock>();
@@ -710,6 +713,7 @@ namespace ScannerParser {
                 // This case causes issues with register allocation as it
                 // is possibly not needed for constants
               else if (A.type == Kind.CONST && B.type == Kind.CONST) {
+                  res = new Result(Kind.CONST, "");
                 switch (opCode) {
                     case Token.TIMES:
                         res.SetValue(Double.Parse(A.GetValue()) * Double.Parse(B.GetValue()));
@@ -724,8 +728,6 @@ namespace ScannerParser {
                         res.SetValue(Double.Parse(A.GetValue()) - Double.Parse(B.GetValue()));
                         break;
                 }
-
-                res.type = Kind.CONST;
             }
 
             return res;
@@ -879,7 +881,42 @@ namespace ScannerParser {
             if (res.condition != CondOp.ERR) {
                 string negatedTokenString = TokenToInstruction(NegatedConditional(res.condition));
                 //PutF1(negatedTokenString, res, new Result(Kind.CONST, "offset")); //todo, fix for new PutF1 stuff
+
+                BasicBlock loopHeaderBlock = new BasicBlock(nextBBid++);
+                flowGraphNodes[loopHeaderBlock.blockNum] = loopHeaderBlock;
+                loopHeaderBlock.childBlocks = new List<BasicBlock>();
+                loopHeaderBlock.parentBlocks = new List<BasicBlock>();
+                loopHeaderBlock.nestingLevel = globalNestingLevel;
+                loopHeaderBlock.parentBlocks.Add(curBasicBlock);
+                curBasicBlock.childBlocks.Add(loopHeaderBlock);
+                curBasicBlock = loopHeaderBlock;
+                loopHeaderBlocks.Push(curBasicBlock);
+                globalNestingLevel++;
+                
+                BasicBlock loopBodyBlock = new BasicBlock(nextBBid++);
+                flowGraphNodes[loopBodyBlock.blockNum] = loopBodyBlock;
+                loopBodyBlock.childBlocks = new List<BasicBlock>();
+                loopBodyBlock.parentBlocks = new List<BasicBlock>();
+                loopBodyBlock.nestingLevel = globalNestingLevel;
+                loopBodyBlock.parentBlocks.Add(curBasicBlock);
+                loopBodyBlock.childBlocks.Add(curBasicBlock);
+                curBasicBlock.childBlocks.Add(loopBodyBlock);
+                curBasicBlock = loopBodyBlock;
+                
                 StatSequence();
+
+                globalNestingLevel--;
+                curBasicBlock = loopHeaderBlocks.Pop();
+                BasicBlock loopFollowBlock = new BasicBlock(nextBBid++);
+                flowGraphNodes[loopFollowBlock.blockNum] = loopFollowBlock;
+                loopFollowBlock.childBlocks = new List<BasicBlock>();
+                loopFollowBlock.parentBlocks = new List<BasicBlock>();
+                loopFollowBlock.nestingLevel = globalNestingLevel;
+                loopFollowBlock.parentBlocks.Add(curBasicBlock);
+                curBasicBlock.childBlocks.Add(loopFollowBlock);
+                curBasicBlock = loopFollowBlock;
+                
+
                 // todo, here we will need a branch to loop header
                 VerifyToken(Token.OD, "The while loop was not properly closed with the od keyword");
                 Next(); //eat od
