@@ -31,7 +31,6 @@ namespace ScannerParser {
         private Token scannerSym; // current token on input
         private Scanner scanner;
         private FileStream fs; //debug
-        private StreamWriter sw;
         private int currRegister;
         private int AssemblyPC;
         private BasicBlock rootBasicBlock;
@@ -53,7 +52,7 @@ namespace ScannerParser {
         public Parser(String file) {
             scanner = new Scanner(file);
             fs = File.Open(@"../../output.txt", FileMode.Create, FileAccess.ReadWrite);
-            sw = new StreamWriter(fs);
+            SSAWriter.sw = new StreamWriter(fs);
             Init();
             AssemblyPC = 1;
             nextBBid = 1;
@@ -79,8 +78,8 @@ namespace ScannerParser {
 
         ~Parser() {
             try {
-                if (sw != null)
-                    sw.Close();
+                if (SSAWriter.sw != null)
+                    SSAWriter.sw.Close();
                 if (fs != null)
                     fs.Close();
             } catch (Exception) {
@@ -239,11 +238,6 @@ namespace ScannerParser {
                 res = Combine(opCode, res, res2);
             }
 
-            // Handled in Combine
-            //res.type = Kind.REG;
-            //AllocateRegister();
-            //res.regNo = currRegister;
-
             return res;
         }
 
@@ -293,37 +287,17 @@ namespace ScannerParser {
                     Next();
                 } else {
                     // todo, evaluate when this happens
-                    sw.WriteLine("Load {0}[{1}] R{2}", res.GetValue(), res.GetValue(), currRegister);
-                    Console.WriteLine("Load {0}[{1}] R{2}", res.GetValue(), res.GetValue(), currRegister);
-                    res = new Result(Kind.REG, currRegister); // TODO:: Or a variable?
+                    res = SSAWriter.LoadVariable(res, AssemblyPC);
+                    AssemblyPC++;
+                    //sw.WriteLine("{3}: Load {0}[{1}] R{2}", res.GetValue(), res.GetValue(), currRegister, AssemblyPC);
+                    //Console.WriteLine("{3}: Load {0}[{1}] R{2}", res.GetValue(), res.GetValue(), currRegister, AssemblyPC++);
+                    //res = new Result(Kind.REG, currRegister); // TODO:: Or a variable?
                 }
 
             }
             return res;
         }
 
-        private Result MakeArrayReference(Result res) {
-            // find dimensions of array -- > requires symbol table look up
-            int[] arrDims = GetArrayDimensions(res.GetValue());
-
-            Result[] indexer = new Result[arrDims.Length];
-
-
-            for (int i = 0; i < arrDims.Length; i++) {
-                VerifyToken(Token.OPENBRACKET, "Array missing open bracket");
-                Next();
-                // evaluate indices
-                indexer[i] = Expression();
-                VerifyToken(Token.CLOSEBRACKET, "Array missing closing bracket");
-                Next();
-            }
-
-
-            return new Result(Kind.ARR, res.GetValue(), indexer);
-
-        }
-
-        // TODO:: Track Array Dimensions
         // TODO:: Handle Arrays correctly --> getting address when needed
 
         private int[] GetArrayDimensions(string arrayName) {
@@ -367,51 +341,7 @@ namespace ScannerParser {
 
             return res;
         }
-
-// TODO: Function things
-// Generates the code that should happen upon entering a function
-// I don't know know where/if we want to call it right now
-        private void FunctionEntryCode(int numLocals) {
-            Result SP = new Result(Kind.REG, "$SP");
-            Result FP = new Result(Kind.REG, "$FP");
-            Result PC = new Result(Kind.REG, "$PC");
-Result currRes;
-            // SSA form
-            // push return address
-            Result newSP = Combine(Token.MINUS, new Result(Kind.CONST, 4), SP); // push stack down
-            currRes =  Combine(Token.PLUS, PC, new Result(Kind.CONST, 4)); // compute return address
-            Store(currRes, newSP);
-            // push current FP
-            newSP = Combine(Token.MINUS, new Result(Kind.CONST, 4), newSP); // push stack down
-            Store(FP, newSP);
-
-            // push callee save registers // Can we get away with making the caller push all needed registers?
-            // set fp = sp - 4*numLocals
-
-            // set sp = fp
-
-// DLX form
-            // push return address
-            // push current FP
-            // push callee save registers // Can we get away with making the caller push all needed registers?
-            // set fp = sp - 4*numLocals
-            // set sp = fp
-
-
-
-        }
-
-// Generates the code that should happen upon exiting a function
-// I don't know know where/if we want to call it right now
-        private void FunctionExitCode(int numLocals, Result returnValue) {
-            // Put ret val in ret reg
-            // reset stackpointer: SP = FP + 4*numLocals
-            // pop callee save registers
-            // pop/restore FP
-
-            // pop return address into $ra
-// return to caller --> jump $ra
-        }
+      
         private Result FuncCall() {
             Result res = null;
             List<Result> optionalArguments = null;
@@ -426,11 +356,16 @@ Result currRes;
                     // Verify function is in scope
                     if (CheckScope(scanner.String2Id(res.GetValue()))) {
 
+                        SSAWriter.FunctionEntry(res, AssemblyPC++);
                         if (scannerSym == Token.OPENPAREN) {
                             Next();
                             if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER) {
                                 optionalArguments = new List<Result>();
-                                optionalArguments.Add(Expression());
+                                Result currArg = Expression();
+                                optionalArguments.Add(currArg);
+                                // TODO:: Need to store the function's offset somewhere, i.e which argument is it
+                                SSAWriter.StoreFunctionArgument(currArg, AssemblyPC);
+                                AssemblyPC++;
                             } else {
                                 Next();
                             }
@@ -440,36 +375,20 @@ Result currRes;
                                 Next();
                                 if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER ||
                                 scannerSym == Token.OPENPAREN || scannerSym == Token.CALL) {
-                                    optionalArguments.Add(Expression());
+                                    Result currArg = Expression();
+                                    optionalArguments.Add(currArg);
+                                // TODO:: Need to store the function's offset somewhere, i.e which argument is it
+                                    SSAWriter.StoreFunctionArgument(currArg, AssemblyPC);
+                                    AssemblyPC++;
                                 } else {
                                     scanner.Error("Ended up in optional arguments of function call and didn't parse a number, variable, comma, or expression");
                                 }
                             }
 
-
                             VerifyToken(Token.CLOSEPAREN, "Ended up in arguments of function call and didn't parse a number, variable, comma, or expression");
                             Next();
-                            // Combine ALL THE THINGS! -- I don't know how to do this, how does
-                            // passing arguments to function work in assembly?! BWAAAAHHHH!
-
+                            
                         }
-
-
-                        // TODO:: 
-                        // load up the function parameters
-                        // save return address
-                        // save any needed registers
-
-                        // BUT for now:
-                        sw.Write("call {0}", res.GetValue());
-
-                        Console.Write("call {0} (", res.GetValue());
-                        foreach (Result r in optionalArguments) {
-                            sw.Write("{0}, ", r.GetValue());
-                            Console.Write("{0}, ", r.GetValue());
-                        }
-                        sw.Write(")\n");
-                        Console.Write(")\n");
 
                         if (symbolTable[scanner.String2Id(res.GetValue())].type == Token.FUNC) {
                             res = new Result(Kind.REG, "EAX"); // going to call return register EAX
@@ -477,20 +396,17 @@ Result currRes;
                     } else {
                         scanner.Error(String.Format("Tried to call an undefined function : {0}", res.GetValue()));
                     }
-
-                    
                     break;
 
                 case Token.OUTPUTNEWLINE:
-
                     Next(); // eat OutputNewLine()
                     VerifyToken(Token.OPENPAREN, "Called OutputNewLine, missing (");
                     Next(); // eat (
                     VerifyToken(Token.CLOSEPAREN, "Called OutputNewLine, missing )");
                     Next(); // eat )
                     //sw.WriteLine("WRL");
-                    sw.WriteLine("writeNL");
-                    Console.WriteLine("writeNL");
+                    SSAWriter.sw.WriteLine("{0}: writeNL", AssemblyPC);
+                    Console.WriteLine("{0}: writeNL", AssemblyPC++);
 
                     break;
 
@@ -504,8 +420,8 @@ Result currRes;
                     else if (scannerSym == Token.NUMBER || scannerSym == Token.IDENT)
                         res = Expression();
                     //sw.WriteLine("WRD " + res.GetValue());
-                    sw.WriteLine("write " + res.GetValue());
-                    Console.WriteLine("write " + res.GetValue());
+                    SSAWriter.sw.WriteLine("{0}: write {1}", AssemblyPC,  res.GetValue());
+                    Console.WriteLine("{0}: write {1} " , AssemblyPC++,  res.GetValue());
 
                     VerifyToken(Token.CLOSEPAREN, "OutputNum missing )");
                     Next(); // eat )
@@ -519,8 +435,10 @@ Result currRes;
                     Next(); // eat (
                     VerifyToken(Token.CLOSEPAREN, "InputNum has too many arguments or is missing )");
                     Next(); // eat ) 
-                    AllocateRegister();
-                    res = new Result(Kind.REG, currRegister);
+                    res = new Result(Kind.REG, String.Format("({0})", AssemblyPC));
+                    SSAWriter.sw.WriteLine("{0}: read", AssemblyPC);
+                    Console.WriteLine("{0}: read  " , AssemblyPC++);
+
                     //sw.WriteLine("RDD {0}", res.regNo);
                     break;
 
@@ -687,8 +605,7 @@ Result currRes;
 
                 // Needs to output a move instruction which for now will be done here,
                 // but maybe should be moved elsewhere
-                PutF2("mov", res2.GetValue(), res1.GetValue());
-                AssemblyPC++;
+                SSAWriter.PutInstruction("mov", res2.GetValue(), res1.GetValue(), AssemblyPC++);
 
                 // TODO:: THis is wrong.  res1 and res2 may not be registers.  Should they be?
                 //sw.WriteLine("{0} {1} {2} {3}", assignSym, res1.regNo, res2.regNo, "R0"); // todo, need to modify for becomes case
@@ -704,7 +621,7 @@ Result currRes;
             if (A.type == Kind.VAR && B.type == Kind.VAR) {
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
-                        res = PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B);
+                        res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
@@ -713,7 +630,7 @@ Result currRes;
             } else if (A.type == Kind.VAR && B.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
-                        res = PutArithmeticImmInstruction(TokenToInstruction(opCode), A, B);
+                        res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), A, B, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
@@ -723,7 +640,7 @@ Result currRes;
             } else if (A.type == Kind.REG && B.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
-                        res = PutArithmeticImmInstruction(TokenToInstruction(opCode), A, B);
+                        res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), A, B, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
@@ -735,7 +652,7 @@ Result currRes;
 
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
-                        res = PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B);
+                        res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
@@ -746,7 +663,7 @@ Result currRes;
 
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
-                        res = PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B);
+                        res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
@@ -756,7 +673,7 @@ Result currRes;
 
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
-                        res = PutArithmeticImmInstruction(TokenToInstruction(opCode), B, A);
+                        res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), B, A, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
@@ -767,7 +684,7 @@ Result currRes;
 
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
-                        res = PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B);
+                        res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
@@ -777,12 +694,12 @@ Result currRes;
             } else if (B.type == Kind.REG && A.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
-                        res = PutArithmeticImmInstruction(TokenToInstruction(opCode), B, A);
+                        res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), B, A, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
                 }
-                //PutF1(TokenToInstruction(opCode) + "i", loadedA, B);
+
 
             }
                 // This case causes issues with register allocation as it
@@ -822,6 +739,8 @@ Result currRes;
                 }
 
                 // start program
+                SSAWriter.sw.WriteLine("MAIN: ");
+                Console.WriteLine("MAIN: ");
                 if (VerifyToken(Token.BEGIN, "Missing Opening bracket of program")) {
 
                     Next();
@@ -831,7 +750,7 @@ Result currRes;
                 if (VerifyToken(Token.END, "Missing closing bracket of program")) {
                     Next();
                     if (VerifyToken(Token.PERIOD, "Unexpected end of program - missing period")) {
-                        sw.WriteLine("RET 0");
+                        SSAWriter.sw.WriteLine("{0}: end", AssemblyPC++);
                     }
 
                 }
@@ -861,6 +780,9 @@ Result currRes;
                 function = new Symbol(funcType, scanner.id, AssemblyPC, scopes.Peek());
             }
             AddToSymbolTable(function, scopes.Peek());
+
+            SSAWriter.sw.WriteLine("{0}:", scanner.Id2String(function.identID).ToUpper());
+            Console.WriteLine("{0}:", scanner.Id2String(function.identID).ToUpper());
 
             Next(); // eat ident
             
@@ -963,6 +885,8 @@ Result currRes;
             return null;
         }
 
+
+// TODO:: Need to move the return value OUT of EAX
         private Result ReturnStatement() {
             VerifyToken(Token.RETURN, "Missing return keyword");
             Next();
@@ -976,17 +900,17 @@ Result currRes;
 
                 res = Expression();
                 if (res == null)
-                    Console.WriteLine("{0}: Got null res");
+                    Console.WriteLine("{0}: Got null res", AssemblyPC);
 
-                sw.WriteLine("ret {0}", res.GetValue());
+                SSAWriter.ReturnFromFunction(res, AssemblyPC);
+                AssemblyPC++;
                 // current scope ends
                 scopes.Pop();
                 return res;
 
             } else {
-                //     }
-
-                sw.WriteLine("ret");
+                SSAWriter.ReturnFromProcedure(AssemblyPC);
+                AssemblyPC++;
                 // current scope ends
                 scopes.Pop();
                 return null;
@@ -1042,176 +966,78 @@ Result currRes;
 
         }
 
-        private void OutputNum(Result r) {
-            // todo, implement outputNum, but we need way of knowing that it needs to be called
-            if (r.type == Kind.REG) {
-
-            } else {
-                Debug.WriteLine("OutputNum was not provided with a register as an argument, this is a parser error");
-            }
-        }
-
 
         private void ConditionalJumpForward(Result x) {
 
         }
 
-        private Token NegatedConditional(CondOp? cond) {
-            // todo, do we even need CondOp? It seems redundant
-            switch (cond) {
-                case CondOp.EQ:
-                    return Token.NEQ;
-                case CondOp.NEQ:
-                    return Token.EQL;
-                case CondOp.LT:
-                    return Token.GEQ;
-                case CondOp.GT:
-                    return Token.LEQ;
-                case CondOp.LEQ:
-                    return Token.GTR;
-                case CondOp.GEQ:
-                    return Token.LSS;
-                default:
-                    return Token.ERROR;
+        //////////////////////////////////////////////
+        // Utility Functions
+        //////////////////////////////////////////////
+
+        // Checks if scannerSym == t
+        // if not, pushes errMsg to Scanner and exits
+        private bool VerifyToken(Token t, string errMsg) {
+            if (scannerSym != t)
+                scanner.Error(errMsg); // will exit program
+            return true;
+        }
+
+        // Verifies the identifier is indeed in scope
+        private bool CheckScope(int identID) {
+
+            if (identID == -1) {
+                Console.WriteLine("{0}: Identifier {1} doesn't exist", AssemblyPC, identID);
+                return false;
             }
+            Symbol curSym = symbolTable[identID];
+            return curSym.IsInScope(scopes.Peek());
+
         }
 
+        // Adds the symbol to the symbol table, if its ID is unique
+        // else, adds the scope to the symbol
+        private void AddToSymbolTable(Symbol s, int scope) {
 
-        // We need this
-        // TODO:: Make LoadVariable Correct
-        private Result LoadVariable(Result r) {
-            AllocateRegister();
-            sw.WriteLine("load R{1} {0}", r.GetValue(), currRegister);
-            Console.WriteLine("load R{1} {0}", r.GetValue(), currRegister);
-            Result res = new Result(Kind.REG, currRegister);
-            return res;
-        }
-
-        // Stores thingtoStore at whereToStore
-        // whereToStore must be a register
-        private void Store(Result thingToStore, Result whereToStore) {
-            if (whereToStore.type == Kind.REG) {
-                sw.WriteLine("store R{1} {0}", thingToStore.GetValue(), whereToStore.GetValue());
-                Console.WriteLine("store R{1} {0}", thingToStore.GetValue(), whereToStore.GetValue());
-              
+            if (s.identID < symbolTable.Count && symbolTable[s.identID] != null) {
+                // already have a symbol with this name
+                symbolTable[s.identID].AddScope(scope);
             } else {
-                Console.WriteLine("WARNING: Attempting to store in something that isn't a register");
+                symbolTable.Insert(scanner.id, s);
+            }
+        }
+
+        // Call when we want to keep compiling after an error
+// Scans until we hit the next line of the file
+        private void AbortLine() {
+            int currPC = scanner.PC;
+            while (scanner.PC == currPC) {
+                Next();
             }
 
-            
+
         }
 
-        // This function puts an arithmetic instruction where all arguments are registers
-        // or variables (but will need to only be registers in the final output, but this
-        // should be handled by SSA)
-        private Result PutArithmeticRegInstruction(string opCode, Result a, Result b) {
+        private Result MakeArrayReference(Result res) {
+            // find dimensions of array -- > requires symbol table look up
+            int[] arrDims = GetArrayDimensions(res.GetValue());
 
-            if (a.type == Kind.REG && b.type == Kind.REG)
-                PutF2(opCode, a.GetValue(), b.GetValue());
-            else if (a.type == Kind.REG && b.type == Kind.VAR) {
-                PutF2(opCode, a.GetValue(), b.GetValue());
-            } else if (a.type == Kind.VAR && b.type == Kind.REG) {
-                PutF2(opCode, a.GetValue(), b.GetValue());
-            } else {
-                PutF2(opCode, a.GetValue(), b.GetValue());
+            Result[] indexer = new Result[arrDims.Length];
+
+
+            for (int i = 0; i < arrDims.Length; i++) {
+                VerifyToken(Token.OPENBRACKET, "Array missing open bracket");
+                Next();
+                // evaluate indices
+                indexer[i] = Expression();
+                VerifyToken(Token.CLOSEBRACKET, "Array missing closing bracket");
+                Next();
             }
 
-            Result res = new Result(Kind.REG, String.Format("({0})", AssemblyPC));
-            AssemblyPC++;
-            return res;
-        }
 
-        // This function puts an arithmetic instruction where the first arguments is a register
-        // or a variable and the second argument is an immediate
-        private Result PutArithmeticImmInstruction(string opCode, Result a, Result b) {
-
-            opCode += "i";
-
-            if (a.type == Kind.REG && b.constantType == ConstantType.DOUBLE)
-                PutF1(opCode, a.GetValue(), b.GetValue());
-            else if (a.type == Kind.REG && b.constantType == ConstantType.STRING) {
-                PutF1(opCode, a.GetValue(), b.GetValue());
-            } else if (a.type == Kind.VAR && b.constantType == ConstantType.DOUBLE) {
-                PutF1(opCode, a.GetValue(), b.GetValue());
-            } else {
-                PutF1(opCode, a.GetValue(), b.GetValue());
-            }
-
-            Result res = new Result(Kind.REG, String.Format("({0})", AssemblyPC));
-            AssemblyPC++;
-            return res;
-        }
-
-        // todo, both PutF1 and PutF2 were changed to take strings rather than Results because
-        // registers are not available
-        // This function, along with the other puts output assembly in the following format:
-        // opcode (resultReg) (argReg1) (argReg2)
-        // This may need to be changed because in his examples the instructions only have
-        // two arguments and do not have the result register specified.
-        private void PutF2(string opString, string a, string b) {
-            sw.WriteLine("{0} {1} {2} {3}", opString, String.Format("({0})", AssemblyPC), a, b);
-            Console.WriteLine("{0} {1} {2} {3}", opString, String.Format("({0})", AssemblyPC), a, b);
-        }
-
-
-        private void PutF1(string op, string a, double b) {
-            sw.WriteLine("{0} {1} {2} {3}", op, String.Format("({0})", AssemblyPC), a, b);
-            Console.WriteLine("{0} {1} {2} {3}", op, String.Format("({0})", AssemblyPC), a, b);
-        }
-
-        // Creates a F1 instruction
-        // Result b should be the Constant
-        private void PutF1(string op, string a, string b) {
-            sw.WriteLine("{0} {1} {2} {3}", op, String.Format("({0})", AssemblyPC), a, b);
-            Console.WriteLine("{0} {1} {2} {3}", op, String.Format("({0})", AssemblyPC), a, b);
-            //if (b.type == Kind.CONST) {
-            //    sw.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.GetValue());
-            //    Console.WriteLine("{0} {1} {2} {3}", op, currRegister, a.regNo, b.GetValue());
-
-            //}
-            //else if (a.type == Kind.COND) {
-            //    // todo, the value for the second parameter shouldn't be a string
-            //    // it needs to be the offset, but don't know how to do that yet
-            //    sw.WriteLine("{0} {1} {2}", op, a.regNo, b.GetValue());
-            //    Console.WriteLine("{0} {1} {2}", op, a.regNo, b.GetValue());
-            //}
-            //else {
-            //    Console.WriteLine("PutF1 paramters in wrong order.");
-            //    sw.WriteLine("{0} {1} {2} {3}", op, currRegister, b.regNo, a.GetValue());
-            //    Console.WriteLine("{0} {1} {2} {3}", op, currRegister, b.regNo, a.GetValue());
-
-            //}
-
+            return new Result(Kind.ARR, res.GetValue(), indexer);
 
         }
-
-        // TODO:: When storing/loading, need 
-        // ADDA Base_Ptr Array_Loc
-        // LOAD/STORE
-        private void LoadArray(Result array) {
-            int[] dims = GetArrayDimensions(array.GetValue());
-            Result[] inds = array.arrIndices;
-            int addr = -1;
-            // i*numCols + j
-            for (int i = 0; i < inds.Length; i++) {
-                if (inds[i].type == Kind.CONST) {
-                    addr = 4 * Int32.Parse(inds[i].GetValue());
-                }
-
-            }
-            if (addr != -1)
-                sw.WriteLine("{0}: adda {1} {2}", AssemblyPC, array.GetValue(), addr);
-
-            sw.WriteLine("load ({0})", AssemblyPC);
-            AssemblyPC += 2;
-        }
-        private void AllocateRegister() {
-            currRegister++;
-        }
-        private void DeallocateRegister() {
-            currRegister--;
-        }
-
         private OpCodeClass GetOpCodeClass(Token opCode, bool immediate = false) {
             switch (opCode) {
                 case Token.TIMES:
@@ -1269,49 +1095,28 @@ Result currRes;
             }
             return opString;
         }
-
-        // Checks if scannerSym == t
-        // if not, pushes errMsg to Scanner and exits
-        private bool VerifyToken(Token t, string errMsg) {
-            if (scannerSym != t)
-                scanner.Error(errMsg); // will exit program
-            return true;
-        }
-
-        // Verifies the identifier is indeed in scope
-        private bool CheckScope(int identID) {
-
-            if (identID == -1) {
-                Console.WriteLine("{0}: Identifier {1} doesn't exist", AssemblyPC, identID);
-                return false;
-            }
-            Symbol curSym = symbolTable[identID];
-            return curSym.IsInScope(scopes.Peek());
-
-        }
-
-        // Adds the symbol to the symbol table, if its ID is unique
-        // else, adds the scope to the symbol
-        private void AddToSymbolTable(Symbol s, int scope) {
-
-            if (s.identID < symbolTable.Count && symbolTable[s.identID] != null) {
-                // already have a symbol with this name
-                symbolTable[s.identID].AddScope(scope);
-            } else {
-                symbolTable.Insert(scanner.id, s);
+           private Token NegatedConditional(CondOp? cond) {
+            // todo, do we even need CondOp? It seems redundant
+            switch (cond) {
+                case CondOp.EQ:
+                    return Token.NEQ;
+                case CondOp.NEQ:
+                    return Token.EQL;
+                case CondOp.LT:
+                    return Token.GEQ;
+                case CondOp.GT:
+                    return Token.LEQ;
+                case CondOp.LEQ:
+                    return Token.GTR;
+                case CondOp.GEQ:
+                    return Token.LSS;
+                default:
+                    return Token.ERROR;
             }
         }
 
-        // Call when we want to keep compiling after an error
-// Scans until we hit the next line of the file
-        private void AbortLine() {
-            int currPC = scanner.PC;
-            while (scanner.PC == currPC) {
-                Next();
-            }
 
 
-        }
 
     }
 }
