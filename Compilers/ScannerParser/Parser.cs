@@ -279,6 +279,11 @@ namespace ScannerParser {
             } else if (scannerSym == Token.CALL) {
                 // TODO:: where to put the result of a function call?
                 res = FuncCall();
+                // TODO:: THis might be a hack
+                // move result out of EAX
+                if (res.GetValue().CompareTo("EAX") == 0) {
+                    //TODO:: Something here
+                }
 
             } else if (scannerSym == Token.OPENPAREN) {
                 Next();
