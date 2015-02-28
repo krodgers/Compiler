@@ -55,15 +55,18 @@ namespace ScannerParser {
         }
         // gets argument from stack
         // Need to increment Assembly line by 2
-        public static Result LoadFunctionArgument(int argumentOffset, int lineNumber) {
+        public static Result LoadFunctionArgument(int argumentOffset, Result arg, int lineNumber) {
             sw.WriteLine("{0}: sub #{1} $FP", lineNumber, argumentOffset);
             Console.WriteLine("{0}: sub #{1} $FP", lineNumber, argumentOffset);
+            sw.WriteLine("{0}: move ({1}) {2}", lineNumber + 1, lineNumber, arg.GetValue());
+            Console.WriteLine("{0}: move ({1}) {2}", lineNumber + 1, lineNumber, arg.GetValue());
+
             return new Result(Kind.REG, String.Format("({0})", lineNumber + 1));
         }
         public static void ReturnFromFunction(Result returnValue, int lineNumber) {
             sw.WriteLine("{1}: ret {0}", returnValue.GetValue(), lineNumber);
             Console.WriteLine("{1}: ret {0}", returnValue.GetValue(), lineNumber);
-                
+
         }
         public static void ReturnFromProcedure(int lineNumber) {
             sw.WriteLine("{0}: ret", lineNumber);

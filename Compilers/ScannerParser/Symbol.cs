@@ -11,10 +11,12 @@ namespace ScannerParser {
         public Token type; // what this symbol is, VAR, FUNC, PROC, ARR ...
         public int currLineNumber {  set; get; } // the last line number this variable seen on
         public int identID { private set; get; }
+        public int currentValueLineNumber; // e.g. (3) for value of line (3)
+        // example: 3: move 1 i  --> i.currentValueLineNumber == (3)
         private int[] arrDims;// for if it's an array
 
         private Dictionary<int, Result> validScopes; // scope is key, value is value of the symbol in the scope
-      
+        private int functionOffset; // if the symbol is a function argument, its offset from FP (-4, -8...)
 
         // Constructor 
         public Symbol(Token whatAmI, int ID, int lineNum, int scope) {
@@ -24,6 +26,7 @@ namespace ScannerParser {
             arrDims = null;
             validScopes = new Dictionary<int, Result>();
             validScopes.Add(scope, null);
+            functionOffset = 0;
 
         }
 
@@ -34,6 +37,7 @@ namespace ScannerParser {
             arrDims = arrayDimensions;
             validScopes = new Dictionary<int, Result>();
             validScopes.Add(scope, null);
+            functionOffset = 0;
         }
 
         // Accessors
@@ -70,7 +74,16 @@ namespace ScannerParser {
                 return null;
             }
 
+        }
 
+// Returns 0 if it doesn't have an offset
+        public int GetFunctionArgumentOffset() {
+            if (type == Token.VAR) {
+                return functionOffset;
+            } else {
+                Console.WriteLine("WARNING: {0} shouldn't have an argument offset", type);
+                return 0;
+            }
         }
 
 
@@ -89,6 +102,16 @@ namespace ScannerParser {
             } else {
                 return false;
             }
+        }
+        
+        public void SetArgumentOffset(int offset) {
+            if (offset > 0) {
+                Console.WriteLine("WARNING: Setting positive argument offset");
+            }
+            if (type != Token.VAR) {
+                Console.WriteLine("WARNING: Setting an offset for {0}", type);
+            }
+            functionOffset = offset; 
         }
 
 

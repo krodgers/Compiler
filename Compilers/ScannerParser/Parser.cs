@@ -350,6 +350,7 @@ namespace ScannerParser {
             return res;
         }
       
+// TODO:: Get argument variables correctly
         private Result FuncCall() {
             Result res = null;
             List<Result> optionalArguments = null;
@@ -363,15 +364,17 @@ namespace ScannerParser {
 
                     // Verify function is in scope
                     if (CheckScope(scanner.String2Id(res.GetValue()))) {
-
-                        SSAWriter.FunctionEntry(res, AssemblyPC++);
+                        // Parse arguments
                         if (scannerSym == Token.OPENPAREN) {
                             Next();
                             if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER) {
                                 optionalArguments = new List<Result>();
                                 Result currArg = Expression();
+                                if (currArg == null) {
+                                    Console.WriteLine("WARNING:{0}: Got Null argument in Function Argument ", AssemblyPC);
+                                }
                                 optionalArguments.Add(currArg);
-                                // TODO:: Need to store the function's offset somewhere, i.e which argument is it
+                                // TODO:: Need to store the function's offset somewhere -- done - in Symbol Class
                                 SSAWriter.StoreFunctionArgument(currArg, AssemblyPC);
                                 AssemblyPC++;
                             } else {
@@ -395,9 +398,12 @@ namespace ScannerParser {
 
                             VerifyToken(Token.CLOSEPAREN, "Ended up in arguments of function call and didn't parse a number, variable, comma, or expression");
                             Next();
-                            
+
                         }
 
+                        // branch to function
+                        SSAWriter.FunctionEntry(res, AssemblyPC++);
+                     
                         if (symbolTable[scanner.String2Id(res.GetValue())].type == Token.FUNC) {
                             res = new Result(Kind.REG, "EAX"); // going to call return register EAX
                         }
@@ -464,6 +470,7 @@ namespace ScannerParser {
             return res;
         }
 
+// TODO:: NEed to print out branching instructions
         private Result IfStatement() {
             
             Result res = null;
@@ -623,10 +630,29 @@ namespace ScannerParser {
             }
         }
 
-        private Result Combine(Token opCode, Result A, Result B) {
-            Result res = null; ;
 
-            if (A.type == Kind.VAR && B.type == Kind.VAR) {
+// TODO:: Need to get function arguments from the stack
+        private Result Combine(Token opCode, Result A, Result B) {
+Result newA = A, newB = B; // in case we need to change them b/c they need to be loaded
+            Result res = null;
+            // Check if the results are function values
+            // If so, load them accordingly
+            if (A.type == Kind.VAR) {
+                int offset = symbolTable[scanner.String2Id(A.GetValue())].GetFunctionArgumentOffset();
+                if (offset != 0) {
+                    newA = SSAWriter.LoadFunctionArgument(offset, A, AssemblyPC);
+                    AssemblyPC += 2;
+                }
+            }
+            if (B.type == Kind.VAR) {
+                int offset = symbolTable[scanner.String2Id(A.GetValue())].GetFunctionArgumentOffset();
+                if (offset != 0) {
+                    newB = SSAWriter.LoadFunctionArgument(offset, B, AssemblyPC);
+                    AssemblyPC += 2;
+                }
+            }
+
+            if (newA.type == Kind.VAR && newB.type == Kind.VAR) {
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
                         res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B, AssemblyPC++);
@@ -635,7 +661,7 @@ namespace ScannerParser {
                         break;
                 }
                 //PutF2(TokenToInstruction(opCode), loadedA, loadedB);
-            } else if (A.type == Kind.VAR && B.type == Kind.CONST) {
+            } else if (newA.type == Kind.VAR && newB.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
                         res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), A, B, AssemblyPC++);
@@ -645,7 +671,7 @@ namespace ScannerParser {
                 }
                 //PutF1(TokenToInstruction(opCode) + "i", loadedA, B);
 
-            } else if (A.type == Kind.REG && B.type == Kind.CONST) {
+            } else if (newA.type == Kind.REG && newB.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
                         res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), A, B, AssemblyPC++);
@@ -655,7 +681,7 @@ namespace ScannerParser {
                 }
                 //PutF1(TokenToInstruction(opCode) + "i", loadedA, B);
 
-            } else if (A.type == Kind.VAR && B.type == Kind.REG) {
+            } else if (newA.type == Kind.VAR && newB.type == Kind.REG) {
                 // todo, fill in later because reg is weird right now
 
                 switch (GetOpCodeClass(opCode)) {
@@ -667,7 +693,7 @@ namespace ScannerParser {
                 }
                 //PutF2(TokenToInstruction(opCode), loadedA, B);
 
-            } else if (B.type == Kind.REG && A.type == Kind.REG) {
+            } else if (newB.type == Kind.REG && newA.type == Kind.REG) {
 
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
@@ -677,7 +703,7 @@ namespace ScannerParser {
                         break;
                 }
                 //PutF2(TokenToInstruction(opCode), loadedB, loadedA);
-            } else if (B.type == Kind.VAR && A.type == Kind.CONST) {
+            } else if (newB.type == Kind.VAR && newA.type == Kind.CONST) {
 
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
@@ -688,7 +714,7 @@ namespace ScannerParser {
                 }
                 //PutF1(TokenToInstruction(opCode) + "i", loadedB, A);
 
-            } else if (B.type == Kind.VAR && A.type == Kind.REG) {
+            } else if (newB.type == Kind.VAR && newA.type == Kind.REG) {
 
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
@@ -699,7 +725,7 @@ namespace ScannerParser {
                 }
                 //PutF2(TokenToInstruction(opCode), loadedB, A);
 
-            } else if (B.type == Kind.REG && A.type == Kind.CONST) {
+            } else if (newB.type == Kind.REG && newA.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
                         res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), B, A, AssemblyPC);
@@ -712,20 +738,20 @@ namespace ScannerParser {
             }
                 // This case causes issues with register allocation as it
                 // is possibly not needed for constants
-              else if (A.type == Kind.CONST && B.type == Kind.CONST) {
+              else if (newA.type == Kind.CONST && newB.type == Kind.CONST) {
                   res = new Result(Kind.CONST, "");
                 switch (opCode) {
                     case Token.TIMES:
-                        res.SetValue(Double.Parse(A.GetValue()) * Double.Parse(B.GetValue()));
+                        res.SetValue(Double.Parse(newA.GetValue()) * Double.Parse(newB.GetValue()));
                         break;
                     case Token.DIV:
-                        res.SetValue(Double.Parse(A.GetValue()) / Double.Parse(B.GetValue()));
+                        res.SetValue(Double.Parse(newA.GetValue()) / Double.Parse(newB.GetValue()));
                         break;
                     case Token.PLUS:
-                        res.SetValue(Double.Parse(A.GetValue()) + Double.Parse(B.GetValue()));
+                        res.SetValue(Double.Parse(newA.GetValue()) + Double.Parse(newB.GetValue()));
                         break;
                     case Token.MINUS:
-                        res.SetValue(Double.Parse(A.GetValue()) - Double.Parse(B.GetValue()));
+                        res.SetValue(Double.Parse(newA.GetValue()) - Double.Parse(newB.GetValue()));
                         break;
                 }
             }
@@ -758,6 +784,8 @@ namespace ScannerParser {
                     Next();
                     if (VerifyToken(Token.PERIOD, "Unexpected end of program - missing period")) {
                         SSAWriter.sw.WriteLine("{0}: end", AssemblyPC++);
+                        Console.WriteLine("{0}: end", AssemblyPC++);
+
                     }
 
                 }
@@ -792,21 +820,27 @@ namespace ScannerParser {
             Console.WriteLine("{0}:", scanner.Id2String(function.identID).ToUpper());
 
             Next(); // eat ident
-            
+
+            int currentOffset = -4;
             if (scannerSym == Token.OPENPAREN) {
                 Next(); // eat openParen
                 // Formal Parameter
                 if (scannerSym == Token.IDENT) {
                     //                    Ident();
                     Next(); // eat ident
-                    AddToSymbolTable(new Symbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek()), scopes.Peek());
+                    Symbol sym = new Symbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek());
+                    sym.SetArgumentOffset(currentOffset);
+                    currentOffset -= 4;
+                    AddToSymbolTable(sym, scopes.Peek());
 
                     while (scannerSym == Token.COMMA) {
                         Next();
                         //                      Ident();
                         Next(); // eat Ident
-                        AddToSymbolTable(new Symbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek()), scopes.Peek());
-
+                        sym = new Symbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek());
+                        sym.SetArgumentOffset(currentOffset);
+                        currentOffset -= 4;
+                        AddToSymbolTable(sym, scopes.Peek());
                     }
                 }
                 VerifyToken(Token.CLOSEPAREN, "Function Declaration missing a closing parenthesis");
@@ -830,6 +864,9 @@ namespace ScannerParser {
             Next(); // eat }
             VerifyToken(Token.SEMI, "Function declaration missing semicolon"); // end function declaration
             Next(); // eat ;
+
+            SSAWriter.LeaveFunction(AssemblyPC);
+            AssemblyPC++;
         }
 
 
