@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace ScannerParser {
-    public enum Kind { VAR, COND, REG, CONST, ARR };
+    public enum Kind { VAR, COND, BRA, REG, CONST, ARR };
     public enum CondOp { GT, LT, LEQ, GEQ, EQ, NEQ, ERR };
     public enum ConstantType { STRING, INT, DOUBLE, BOOLEAN, ADDR};
 

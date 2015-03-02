@@ -15,8 +15,11 @@ namespace ScannerParser {
         private string actualInstruction; // i.e mul x_1 #3 --- DOES NOT CONTAIN LINE NUMBER
 
         public Instruction(int instructionNumber, BasicBlock myBB){
+            instructionNum = instructionNumber;
+            myBoundingBlock = myBB;
             neededInstr = new Instruction[2];
-
+            next = null;
+            prev = null;
         }
 
         public Instruction(int instructionNumber, BasicBlock myBB, string instructionText) {

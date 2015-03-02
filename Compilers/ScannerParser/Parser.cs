@@ -478,6 +478,11 @@ namespace ScannerParser {
         }
 
 // TODO:: NEed to print out branching instructions
+// TODO:: My idea is to add all of the instructions to the basic block as we go along
+// When we get to a place where we can know what branching address will be, we write out the
+// entire block using SSAWriter.WriteControlFlowBlock(curBlock, fixUpAddr)
+// Find out fix up addr by subtractin the current Assembly PC from the first line number in the block
+
         private Result IfStatement() {
             
             Result res = null;

@@ -13,7 +13,7 @@ namespace ScannerParser {
 
             PutInstruction(opCode, a.GetValue(), b.GetValue(), lineNumber);
             Result res = new Result(Kind.REG, String.Format("({0})", lineNumber));
-            
+
             return res;
         }
         public static Result PutArithmeticImmInstruction(string opCode, Result a, Result b, int lineNumber) {
@@ -31,9 +31,9 @@ namespace ScannerParser {
             Console.WriteLine("{0}: {1} {2} {3}", lineNumber, opString, a, b);
         }
 
-        public static void  PutInstruction(string op, string a, double b, int lineNumber) {
-            sw.WriteLine("{0}: {1} {2} {3}", lineNumber, op, b ,a);
-            Console.WriteLine("{0}: {1} {2} {3}", lineNumber, op, b ,a);
+        public static void PutInstruction(string op, string a, double b, int lineNumber) {
+            sw.WriteLine("{0}: {1} {2} {3}", lineNumber, op, b, a);
+            Console.WriteLine("{0}: {1} {2} {3}", lineNumber, op, b, a);
         }
 
         //////////////////////////////////////////////
@@ -51,7 +51,7 @@ namespace ScannerParser {
 
             sw.WriteLine("{0}: sub #4 $SP", lineNumber);
             Console.WriteLine("{0}: sub #4 $SP", lineNumber);
-            Store(argument, new Result(Kind.REG,  String.Format("({0})", lineNumber)), lineNumber + 1);
+            Store(argument, new Result(Kind.REG, String.Format("({0})", lineNumber)), lineNumber + 1);
         }
         // gets argument from stack
         // Need to increment Assembly line by 3
@@ -61,9 +61,9 @@ namespace ScannerParser {
             //sw.WriteLine("{0}: move ({1}) {2}", lineNumber + 1, lineNumber, arg.GetValue());
             //Console.WriteLine("{0}: move ({1}) {2}", lineNumber + 1, lineNumber, arg.GetValue());
 
-//            LoadVariable(new Result(Kind.REG, String.Format("({0})", lineNumber )), lineNumber);
+            //            LoadVariable(new Result(Kind.REG, String.Format("({0})", lineNumber )), lineNumber);
             LoadVariable(arg, lineNumber);
-            return new Result(Kind.REG, String.Format("({0})", lineNumber ));
+            return new Result(Kind.REG, String.Format("({0})", lineNumber));
         }
         public static void ReturnFromFunction(Result returnValue, int lineNumber) {
             sw.WriteLine("{1}: ret {0}", returnValue.GetValue(), lineNumber);
@@ -128,18 +128,26 @@ namespace ScannerParser {
         //////////////////////////////////////////////
         // Writes out all instructions contained in a block 
         public static void WriteBlock(BasicBlock block) {
-            Instruction currInstr = block.firstInstruction;            
+            Instruction currInstr = block.firstInstruction;
             while (currInstr != null) {
                 sw.WriteLine(currInstr.ToString());
                 Console.WriteLine(currInstr.ToString());
+                currInstr = currInstr.next;
             }
         }
-// Writes out the the instructions in an if/while block
-        // Begins as follows:
-        // #:cmp x y
+        // Writes out the the instructions in an if/while block
+        // Adds the branching instruction's address to the instruction
         //##:b__ # branchAddress
         public static void WriteControlFlowBlock(BasicBlock block, String branchAddress) {
-
+            Instruction currInstr = block.firstInstruction;
+            while (currInstr != null) {
+                if (currInstr.myResult.type == Kind.BRA)
+                    Console.WriteLine(String.Format("{0} {1}", currInstr.ToString(), branchAddress));
+                else
+                    Console.WriteLine(currInstr.ToString());
+                currInstr = currInstr.next;
+                
+            }
         }
     }
 }
