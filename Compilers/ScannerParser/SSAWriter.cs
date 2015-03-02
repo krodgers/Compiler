@@ -48,20 +48,22 @@ namespace ScannerParser {
         // puts argument on stack
         // lineNumber: the current line of assembly
         public static void StoreFunctionArgument(Result argument, int lineNumber) {
-            
+
             sw.WriteLine("{0}: sub #4 $SP", lineNumber);
             Console.WriteLine("{0}: sub #4 $SP", lineNumber);
-            StoreVariable(argument, new Result(Kind.CONST, ConstantType.ADDR, lineNumber + 1), lineNumber);
+            Store(argument, new Result(Kind.REG,  String.Format("({0})", lineNumber)), lineNumber + 1);
         }
         // gets argument from stack
-        // Need to increment Assembly line by 2
+        // Need to increment Assembly line by 3
         public static Result LoadFunctionArgument(int argumentOffset, Result arg, int lineNumber) {
-            sw.WriteLine("{0}: sub #{1} $FP", lineNumber, argumentOffset);
-            Console.WriteLine("{0}: sub #{1} $FP", lineNumber, argumentOffset);
-            sw.WriteLine("{0}: move ({1}) {2}", lineNumber + 1, lineNumber, arg.GetValue());
-            Console.WriteLine("{0}: move ({1}) {2}", lineNumber + 1, lineNumber, arg.GetValue());
+            //sw.WriteLine("{0}: sub #{1} $FP", lineNumber, Math.Abs(argumentOffset));
+            //Console.WriteLine("{0}: sub #{1} $FP", lineNumber, Math.Abs(argumentOffset));
+            //sw.WriteLine("{0}: move ({1}) {2}", lineNumber + 1, lineNumber, arg.GetValue());
+            //Console.WriteLine("{0}: move ({1}) {2}", lineNumber + 1, lineNumber, arg.GetValue());
 
-            return new Result(Kind.REG, String.Format("({0})", lineNumber + 1));
+//            LoadVariable(new Result(Kind.REG, String.Format("({0})", lineNumber )), lineNumber);
+            LoadVariable(arg, lineNumber);
+            return new Result(Kind.REG, String.Format("({0})", lineNumber ));
         }
         public static void ReturnFromFunction(Result returnValue, int lineNumber) {
             sw.WriteLine("{1}: ret {0}", returnValue.GetValue(), lineNumber);
@@ -97,16 +99,12 @@ namespace ScannerParser {
             return res;
         }
         // Stores Variable to Memory
-        public static void StoreVariable(Result thingToStore, Result whereToStore, int lineNumber) {
-            if (whereToStore.type == Kind.CONST && whereToStore.constantType == ConstantType.ADDR) {
-                sw.WriteLine("{2}: store R{1} {0}", thingToStore.GetValue(), whereToStore.GetValue(), lineNumber);
-                Console.WriteLine("{2}: store R{1} {0}", thingToStore.GetValue(), whereToStore.GetValue(), lineNumber);
-                
-            } else {
-                Console.WriteLine("WARNING: Attempting to store in something that isn't a register");
-            }
+        public static void Store(Result thingToStore, Result whereToStore, int lineNumber) {
+            sw.WriteLine("{1}: store {0} {2}", thingToStore.GetValue(), lineNumber, whereToStore.GetValue());
+            Console.WriteLine("{1}: store {0} {2} ", thingToStore.GetValue(), lineNumber, whereToStore.GetValue());
         }
-// Afer calling this, need to increase AssemblyPC by 2
+
+        // Afer calling this, need to increase AssemblyPC by 2
         public static void LoadArray(Result array, int[] dims, int lineNumber) {
             Result[] inds = array.arrIndices;
             int addr = -1;
@@ -128,6 +126,20 @@ namespace ScannerParser {
         //////////////////////////////////////////////
         // Utility Functions
         //////////////////////////////////////////////
+        // Writes out all instructions contained in a block 
+        public static void WriteBlock(BasicBlock block) {
+            Instruction currInstr = block.firstInstruction;            
+            while (currInstr != null) {
+                sw.WriteLine(currInstr.ToString());
+                Console.WriteLine(currInstr.ToString());
+            }
+        }
+// Writes out the the instructions in an if/while block
+        // Begins as follows:
+        // #:cmp x y
+        //##:b__ # branchAddress
+        public static void WriteControlFlowBlock(BasicBlock block, String branchAddress) {
 
+        }
     }
 }

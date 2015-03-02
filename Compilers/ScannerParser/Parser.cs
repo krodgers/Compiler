@@ -233,7 +233,7 @@ namespace ScannerParser {
             Token opCode;
             res = Term();
             if (res == null)
-                Console.WriteLine("{0}: Got null res", AssemblyPC);
+                Console.WriteLine("{0}: Expression() got null res", AssemblyPC);
             while (scannerSym == Token.PLUS || scannerSym == Token.MINUS) {
                 opCode = scannerSym == Token.PLUS ? Token.PLUS : Token.MINUS;
                 Next();
@@ -249,7 +249,7 @@ namespace ScannerParser {
             if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER || scannerSym == Token.OPENPAREN || scannerSym == Token.CALL) {
                 res = Factor(); // will end on next token
                 if (res == null)
-                    Console.WriteLine("{0}: Got null res");
+                    Console.WriteLine("{0}: Term() got null res");
 
                 while (scannerSym == Token.TIMES || scannerSym == Token.DIV) {
                     Token tmp = scannerSym;
@@ -274,7 +274,7 @@ namespace ScannerParser {
             if (scannerSym == Token.IDENT) {
                 res = Designator();
                 if (res == null)
-                    Console.WriteLine("{0}: Got null res", AssemblyPC);
+                    Console.WriteLine("{0}: Factor got null res", AssemblyPC);
 
             } else if (scannerSym == Token.NUMBER) {
                 res = new Result(Kind.CONST, Number().GetValue());
@@ -310,7 +310,7 @@ namespace ScannerParser {
 
         private int[] GetArrayDimensions(string arrayName) {
             Symbol currSym = symbolTable[scanner.String2Id(arrayName)];
-            if (currSym == null || !currSym.IsInScope(scopes.Peek())) {
+            if (currSym == null || !currSym.IsInScope(scopes.Peek()) || !currSym.IsGlobal()) {
                 scanner.Error(String.Format("{1}: Array {0} not in scope", arrayName, AssemblyPC));
                 return null;
             }
@@ -324,7 +324,7 @@ namespace ScannerParser {
             VerifyToken(Token.IDENT, "Ended up at Designator but didn't parse an identifier");
             res = Ident();
             if (res == null)
-                Console.WriteLine("{0}: Got null res", AssemblyPC);
+                Console.WriteLine("{0}: Designator got null res", AssemblyPC);
 
             if (scannerSym == Token.OPENBRACKET) {
                 Next(); // eat [
@@ -350,7 +350,6 @@ namespace ScannerParser {
             return res;
         }
       
-// TODO:: Get argument variables correctly
         private Result FuncCall() {
             Result res = null;
             List<Result> optionalArguments = null;
@@ -376,7 +375,11 @@ namespace ScannerParser {
                                 optionalArguments.Add(currArg);
                                 // TODO:: Need to store the function's offset somewhere -- done - in Symbol Class
                                 SSAWriter.StoreFunctionArgument(currArg, AssemblyPC);
-                                AssemblyPC++;
+                                // Set the value of the arguments
+                                int ID = scanner.String2Id(currArg.GetValue());
+                                if (ID != -1)
+                                    UpdateSymbol(symbolTable[ID], currArg);
+                                AssemblyPC+=2;
                             } else {
                                 Next();
                             }
@@ -390,7 +393,11 @@ namespace ScannerParser {
                                     optionalArguments.Add(currArg);
                                 // TODO:: Need to store the function's offset somewhere, i.e which argument is it
                                     SSAWriter.StoreFunctionArgument(currArg, AssemblyPC);
-                                    AssemblyPC++;
+                                // Set the value of the arguments
+                                    int ID = scanner.String2Id(currArg.GetValue());
+                                    if (ID != -1)
+                                        UpdateSymbol(symbolTable[ID], currArg);
+                                    AssemblyPC+=2;
                                 } else {
                                     scanner.Error("Ended up in optional arguments of function call and didn't parse a number, variable, comma, or expression");
                                 }
@@ -419,8 +426,8 @@ namespace ScannerParser {
                     VerifyToken(Token.CLOSEPAREN, "Called OutputNewLine, missing )");
                     Next(); // eat )
                     //sw.WriteLine("WRL");
-                    SSAWriter.sw.WriteLine("{0}: writeNL", AssemblyPC);
-                    Console.WriteLine("{0}: writeNL", AssemblyPC++);
+                    SSAWriter.sw.WriteLine("{0}: wln", AssemblyPC);
+                    Console.WriteLine("{0}: wln", AssemblyPC++);
 
                     break;
 
@@ -611,124 +618,115 @@ namespace ScannerParser {
         private void Assignment() {
             if (scannerSym == Token.LET) {
                 Next();
-                Result res1 = Designator();
+                Result res1 = Designator(); // thing being assigned to
                 Token assignSym = Token.ERROR;
-                if (VerifyToken(Token.BECOMES, "Assignment made without the becomes symbol"))
-                    assignSym = scannerSym;
+                VerifyToken(Token.BECOMES, "Assignment made without the becomes symbol");
+                assignSym = scannerSym;
                 Next();
-                Result res2 = Expression();
+                Result res2 = Expression(); // value of assignment
 
                 // Needs to output a move instruction which for now will be done here,
                 // but maybe should be moved elsewhere
-                SSAWriter.PutInstruction("mov", res2.GetValue(), res1.GetValue(), AssemblyPC++);
-
-                // TODO:: THis is wrong.  res1 and res2 may not be registers.  Should they be?
-                //sw.WriteLine("{0} {1} {2} {3}", assignSym, res1.regNo, res2.regNo, "R0"); // todo, need to modify for becomes case
-                //Console.WriteLine("{0} {1} {2} {3}", assignSym, res1.regNo, res2.regNo, "R0");
+                res2 = LoadIfNeeded(res2);
+                SSAWriter.PutInstruction("mov", res2.GetValue(), res1.GetValue(), AssemblyPC);
+                // If the thing is potentially a variable
+                int ID = scanner.String2Id(res1.GetValue());
+                if (ID != -1) {
+                    UpdateSymbol(symbolTable[ID], null); // log the line number, current result, etc
+                }
+                AssemblyPC++;
             } else {
                 scanner.Error("Ended up at Assignment but didn't encounter let keyword");
             }
         }
 
 
-// TODO:: Need to get function arguments from the stack
+        // TODO:: Need to get function arguments from the stack
         private Result Combine(Token opCode, Result A, Result B) {
-Result newA = A, newB = B; // in case we need to change them b/c they need to be loaded
+            Result newA = A, newB = B; // in case we need to change them b/c they need to be loaded
             Result res = null;
-            // Check if the results are function values
-            // If so, load them accordingly
-            if (A.type == Kind.VAR) {
-                int offset = symbolTable[scanner.String2Id(A.GetValue())].GetFunctionArgumentOffset();
-                if (offset != 0) {
-                    newA = SSAWriter.LoadFunctionArgument(offset, A, AssemblyPC);
-                    AssemblyPC += 2;
-                }
-            }
-            if (B.type == Kind.VAR) {
-                int offset = symbolTable[scanner.String2Id(A.GetValue())].GetFunctionArgumentOffset();
-                if (offset != 0) {
-                    newB = SSAWriter.LoadFunctionArgument(offset, B, AssemblyPC);
-                    AssemblyPC += 2;
-                }
-            }
+            // Check if the variable needs to be loaded from somewhere
+            newA = LoadIfNeeded(A);
+            newB = LoadIfNeeded(B);
+           
 
             if (newA.type == Kind.VAR && newB.type == Kind.VAR) {
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
-                        res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B, AssemblyPC++);
+                        res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
                 }
-                //PutF2(TokenToInstruction(opCode), loadedA, loadedB);
+                //PutF2(TokenToInstruction(opCode), loadednewA loadedB);
             } else if (newA.type == Kind.VAR && newB.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
-                        res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), A, B, AssemblyPC++);
+                        res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
                 }
-                //PutF1(TokenToInstruction(opCode) + "i", loadedA, B);
+                //PutF1(TokenToInstruction(opCode) + "i", loadednewA B);
 
             } else if (newA.type == Kind.REG && newB.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
-                        res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), A, B, AssemblyPC++);
+                        res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
                 }
-                //PutF1(TokenToInstruction(opCode) + "i", loadedA, B);
+                //PutF1(TokenToInstruction(opCode) + "i", loadednewA B);
 
             } else if (newA.type == Kind.VAR && newB.type == Kind.REG) {
                 // todo, fill in later because reg is weird right now
 
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
-                        res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B, AssemblyPC++);
+                        res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
                 }
-                //PutF2(TokenToInstruction(opCode), loadedA, B);
+                //PutF2(TokenToInstruction(opCode), loadednewA B);
 
             } else if (newB.type == Kind.REG && newA.type == Kind.REG) {
 
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
-                        res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B, AssemblyPC);
+                        res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
                 }
-                //PutF2(TokenToInstruction(opCode), loadedB, loadedA);
+                //PutF2(TokenToInstruction(opCode), loadednewB, loadedA);
             } else if (newB.type == Kind.VAR && newA.type == Kind.CONST) {
 
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
-                        res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), B, A, AssemblyPC);
+                        res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), newB, newA, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
                 }
-                //PutF1(TokenToInstruction(opCode) + "i", loadedB, A);
+                //PutF1(TokenToInstruction(opCode) + "i", loadednewB, A);
 
             } else if (newB.type == Kind.VAR && newA.type == Kind.REG) {
 
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
-                        res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), A, B, AssemblyPC);
+                        res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
                 }
-                //PutF2(TokenToInstruction(opCode), loadedB, A);
+                //PutF2(TokenToInstruction(opCode), loadednewB, A);
 
             } else if (newB.type == Kind.REG && newA.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
-                        res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), B, A, AssemblyPC);
+                        res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), newB, newA, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
                         break;
@@ -756,6 +754,56 @@ Result newA = A, newB = B; // in case we need to change them b/c they need to be
                 }
             }
 
+            return res;
+        }
+
+        // TODO:: Update symbol table with variable's current values
+
+        // Loads a variable from stack/memory if needed
+        // Returns argument if doesn't need to be loaded
+        private Result LoadIfNeeded(Result variableToLoad) {
+            Result res = variableToLoad;
+            // Check if it's a function argument of this function
+            if (variableToLoad.type == Kind.VAR) {
+                int variID = scanner.String2Id(variableToLoad.GetValue());
+                Symbol curSymbol = symbolTable[variID];
+
+                int offset = symbolTable[variID].GetFunctionArgumentOffset();
+                if (offset != 0 && curSymbol.IsInScope(scopes.Peek())) {
+                    res = SSAWriter.LoadFunctionArgument(offset, variableToLoad, AssemblyPC);
+                    UpdateSymbol(curSymbol, res);
+                    AssemblyPC += 1;
+
+                } else if (curSymbol.IsGlobal() && curSymbol.GetCurrentValue(scopes.Peek()) == null) {
+
+                    // Check if it's a global that hasn't been loaded yet
+                    res = SSAWriter.LoadVariable(variableToLoad, AssemblyPC);
+                    UpdateSymbol(curSymbol, res);
+                    AssemblyPC += 1;
+
+                } else if (curSymbol.GetCurrentValue(scopes.Peek()) != null){
+                    // Check if the variable has a value already in the scope
+                    res = curSymbol.GetCurrentValue(scopes.Peek());
+                }
+            }
+
+            return res;
+
+        }
+        // Updates the Symbol's value in the symbol table
+        // Update's symbol's last seen line number
+        // If currResult is null, will make a new result of type REG with value (AssemmblyPC)
+        // Returns the newly created result, or the result passed in
+        private Result UpdateSymbol(Symbol s, Result currResult) {
+            Result res = currResult;
+            if (s.type == Token.VAR) {
+                // If no new result given, make one
+                if (currResult == null)
+                    res = new Result(Kind.REG, String.Format("({0})", AssemblyPC));
+
+                s.currLineNumber = AssemblyPC;
+                s.SetValue(scopes.Peek(), res);
+            }
             return res;
         }
 
@@ -867,6 +915,8 @@ Result newA = A, newB = B; // in case we need to change them b/c they need to be
 
             SSAWriter.LeaveFunction(AssemblyPC);
             AssemblyPC++;
+            // current scope ends
+            scopes.Pop();
         }
 
 
@@ -979,19 +1029,16 @@ Result newA = A, newB = B; // in case we need to change them b/c they need to be
 
                 res = Expression();
                 if (res == null)
-                    Console.WriteLine("{0}: Got null res", AssemblyPC);
-
+                    Console.WriteLine("{0}: Expression got null res", AssemblyPC);
+                res = LoadIfNeeded(res);
                 SSAWriter.ReturnFromFunction(res, AssemblyPC);
                 AssemblyPC++;
-                // current scope ends
-                scopes.Pop();
+               // scope may not actually change -- early return statement
                 return res;
 
             } else {
                 SSAWriter.ReturnFromProcedure(AssemblyPC);
                 AssemblyPC++;
-                // current scope ends
-                scopes.Pop();
                 return null;
             }
         }
@@ -1069,8 +1116,12 @@ Result newA = A, newB = B; // in case we need to change them b/c they need to be
                 Console.WriteLine("{0}: Identifier {1} doesn't exist", AssemblyPC, identID);
                 return false;
             }
+            if (identID > symbolTable.Count) {
+                Console.WriteLine("{0}: Unknown symbol.", AssemblyPC);
+                return false;
+            }
             Symbol curSym = symbolTable[identID];
-            return curSym.IsInScope(scopes.Peek());
+            return curSym.IsInScope(scopes.Peek()) || curSym.IsGlobal();
 
         }
 

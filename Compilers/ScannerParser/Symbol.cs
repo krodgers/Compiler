@@ -8,13 +8,11 @@ namespace ScannerParser {
 
     public class Symbol {
 
-        public Token type; // what this symbol is, VAR, FUNC, PROC, ARR ...
+        public Token type{private set; get;} // what this symbol is, VAR, FUNC, PROC, ARR ...
         public int currLineNumber {  set; get; } // the last line number this variable seen on
         public int identID { private set; get; }
-        public int currentValueLineNumber; // e.g. (3) for value of line (3)
-        // example: 3: move 1 i  --> i.currentValueLineNumber == (3)
+       
         private int[] arrDims;// for if it's an array
-
         private Dictionary<int, Result> validScopes; // scope is key, value is value of the symbol in the scope
         private int functionOffset; // if the symbol is a function argument, its offset from FP (-4, -8...)
 
@@ -41,10 +39,10 @@ namespace ScannerParser {
         }
 
         // Accessors
-        // Returns true if this identifier is valid in scope
+        // Returns true if this identifier is valid in this particular scope
+        // Call IsGlobal() to check for global scopes
         public bool IsInScope(int scope) {
-            // 1 is global scope
-            return validScopes.ContainsKey(scope) || validScopes.ContainsKey(1);
+            return validScopes.ContainsKey(scope);
         }
 
         // Returns true if this symbol is a global symbol
@@ -67,7 +65,7 @@ namespace ScannerParser {
         // Returns the last stored value of this symbol in the given scope
         // returns null if the scope isn't valid or symbol hasn't been given a value
         public Result GetCurrentValue(int whichScope) {
-            if (IsInScope(whichScope)) {
+            if (IsInScope(whichScope) && validScopes.ContainsKey(whichScope)) {
                 return validScopes[whichScope];
                 
             } else {
@@ -95,7 +93,7 @@ namespace ScannerParser {
 
         // assign a value to the symbol in given scope
         // returns if it successfully added i.e. is in a correct scope
-        public bool AssignValue(int scope, Result value) {
+        public bool SetValue(int scope, Result value) {
             if (IsInScope(scope)) {
                 validScopes[scope] = value;
                 return true;
@@ -111,8 +109,10 @@ namespace ScannerParser {
             if (type != Token.VAR) {
                 Console.WriteLine("WARNING: Setting an offset for {0}", type);
             }
-            functionOffset = offset; 
+            functionOffset = offset;
         }
+
+      
 
 
     }

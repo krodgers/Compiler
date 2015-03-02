@@ -22,7 +22,7 @@ namespace ScannerParser {
         private string regName;
         private int fixUpLoc;
         private double valueD; // value of constant
-        private string valueS; // value of constant or the variable name
+        private string valueS; // value of constant or the variable name or an address
         private bool valueB; // value of evaluatable conditional
         private string arrBase;
         private int arrAddr;
@@ -132,6 +132,12 @@ namespace ScannerParser {
                             break;
                         case ConstantType.STRING:
                             s = valueS;
+                            break;
+                        case ConstantType.ADDR:
+                            if (valueD != 0)
+                                s = String.Format("MEM[{0}]", valueD);
+                            else
+                                s = valueS;
                             break;
                     }
                     break;

@@ -165,7 +165,15 @@
 
 
 
-
+   //public static void StoreVariable(Result thingToStore, Result whereToStore, int lineNumber) {
+   //         if (whereToStore.type == Kind.CONST && whereToStore.constantType == ConstantType.ADDR) {
+   //             sw.WriteLine("{2}: store MEM[{1}] {0}", thingToStore.GetValue(), whereToStore.GetValue(), lineNumber);
+   //             Console.WriteLine("{2}: store MEM[{1}] {0}", thingToStore.GetValue(), whereToStore.GetValue(), lineNumber);
+                
+   //         } else {
+   //             Console.WriteLine("WARNING: Attempting to store in something that isn't a register");
+   //         }
+   //     }
 
 
 //}
