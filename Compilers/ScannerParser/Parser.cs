@@ -34,6 +34,7 @@ namespace ScannerParser {
         private int currRegister;
         private int AssemblyPC;
         private BasicBlock rootBasicBlock;
+        private BasicBlock entryBlock;
         private BasicBlock curBasicBlock;
         private int nextBBid; // next available basic block id
         private Stack<BasicBlock> parentBlocks;
@@ -44,7 +45,7 @@ namespace ScannerParser {
         private List<Symbol> symbolTable; // all the symbols! // indexed by symbol id
 
         private Stack<BasicBlock> joinBlocks;
-        private Stack<BasicBlock> loopHeaderBlocks;
+        private Stack<BasicBlock> loopBodyBlocks; 
         private int globalNestingLevel;
         BasicBlock trueBlock, falseBlock, joinBlock;
         Dictionary<int, BasicBlock> flowGraphNodes;
@@ -65,8 +66,8 @@ namespace ScannerParser {
             nextScopeNumber = 2;
 
             joinBlocks = new Stack<BasicBlock>();
-            loopHeaderBlocks = new Stack<BasicBlock>();
-
+            loopBodyBlocks = new Stack<BasicBlock>();
+            
             globalNestingLevel = 0;
             trueBlock = falseBlock = joinBlock = null;
             flowGraphNodes = new Dictionary<int, BasicBlock>();
@@ -96,11 +97,18 @@ namespace ScannerParser {
         }
 
         public void StartFirstPass() {
+
+            entryBlock = new BasicBlock(nextBBid++);
+            flowGraphNodes[entryBlock.blockNum] = entryBlock;
+            entryBlock.childBlocks = new List<BasicBlock>();
+            entryBlock.parentBlocks = new List<BasicBlock>();
+
             rootBasicBlock = new BasicBlock(nextBBid++);
             flowGraphNodes[rootBasicBlock.blockNum] = rootBasicBlock;
             rootBasicBlock.childBlocks = new List<BasicBlock>();
             rootBasicBlock.parentBlocks = new List<BasicBlock>();
             rootBasicBlock.nestingLevel = globalNestingLevel;
+            entryBlock.childBlocks.Add(rootBasicBlock);
             curBasicBlock = rootBasicBlock;
 
             Main();
@@ -967,6 +975,10 @@ namespace ScannerParser {
                 string negatedTokenString = TokenToInstruction(NegatedConditional(res.condition));
                 //PutF1(negatedTokenString, res, new Result(Kind.CONST, "offset")); //todo, fix for new PutF1 stuff
 
+                /* todo, for the case when a loop immediately follows another loop with no instructions
+                   in between, we need to delete the empty block from the tree (curBasicBlock). Make sure that its
+                 * block num is exaclty one less than this one and that it is not the root basic block
+                */
                 BasicBlock loopHeaderBlock = new BasicBlock(nextBBid++);
                 flowGraphNodes[loopHeaderBlock.blockNum] = loopHeaderBlock;
                 loopHeaderBlock.childBlocks = new List<BasicBlock>();
@@ -975,7 +987,6 @@ namespace ScannerParser {
                 loopHeaderBlock.parentBlocks.Add(curBasicBlock);
                 curBasicBlock.childBlocks.Add(loopHeaderBlock);
                 curBasicBlock = loopHeaderBlock;
-                loopHeaderBlocks.Push(curBasicBlock);
                 globalNestingLevel++;
 
                 BasicBlock loopBodyBlock = new BasicBlock(nextBBid++);
@@ -984,14 +995,19 @@ namespace ScannerParser {
                 loopBodyBlock.parentBlocks = new List<BasicBlock>();
                 loopBodyBlock.nestingLevel = globalNestingLevel;
                 loopBodyBlock.parentBlocks.Add(curBasicBlock);
-                loopBodyBlock.childBlocks.Add(curBasicBlock);
                 curBasicBlock.childBlocks.Add(loopBodyBlock);
+                loopBodyBlocks.Push(loopBodyBlock);
                 curBasicBlock = loopBodyBlock;
 
                 StatSequence();
 
+                if (loopBodyBlock.childBlocks.Count == 0)
+                {
+                    loopBodyBlock.childBlocks.Add(loopHeaderBlock);
+                }
+
                 globalNestingLevel--;
-                curBasicBlock = loopHeaderBlocks.Pop();
+                curBasicBlock = loopBodyBlocks.Pop();
                 BasicBlock loopFollowBlock = new BasicBlock(nextBBid++);
                 flowGraphNodes[loopFollowBlock.blockNum] = loopFollowBlock;
                 loopFollowBlock.childBlocks = new List<BasicBlock>();
