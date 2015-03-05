@@ -41,18 +41,18 @@ namespace ScannerParser {
         //////////////////////////////////////////////
 
         public static void FunctionEntry(Result functionName, int lineNumber) {
-            sw.WriteLine("{0}: bra {1}", lineNumber, functionName.GetValue().ToUpper());
-            Console.WriteLine("{0}: bra {1}", lineNumber, functionName.GetValue().ToUpper());
-
+            sw.WriteLine("{0}: call {1}", lineNumber, functionName.GetValue().ToUpper());
+            Console.WriteLine("{0}: call {1}", lineNumber, functionName.GetValue().ToUpper());
         }
+
         // puts argument on stack
         // lineNumber: the current line of assembly
         public static void StoreFunctionArgument(Result argument, int lineNumber) {
-
             sw.WriteLine("{0}: sub #4 $SP", lineNumber);
             Console.WriteLine("{0}: sub #4 $SP", lineNumber);
             Store(argument, new Result(Kind.REG, String.Format("({0})", lineNumber)), lineNumber + 1);
         }
+
         // gets argument from stack
         // Need to increment Assembly line by 3
         public static Result LoadFunctionArgument(int argumentOffset, Result arg, int lineNumber) {
@@ -65,16 +65,19 @@ namespace ScannerParser {
             LoadVariable(arg, lineNumber);
             return new Result(Kind.REG, String.Format("({0})", lineNumber));
         }
+
         public static void ReturnFromFunction(Result returnValue, int lineNumber) {
             sw.WriteLine("{1}: ret {0}", returnValue.GetValue(), lineNumber);
             Console.WriteLine("{1}: ret {0}", returnValue.GetValue(), lineNumber);
 
         }
+
         public static void ReturnFromProcedure(int lineNumber) {
             sw.WriteLine("{0}: ret", lineNumber);
             Console.WriteLine("{0}: ret", lineNumber);
 
         }
+
         // branches to ret add
         public static void LeaveFunction(int lineNumber) {
             sw.WriteLine("{0}: bra $RA", lineNumber);
@@ -126,6 +129,8 @@ namespace ScannerParser {
         //////////////////////////////////////////////
         // Utility Functions
         //////////////////////////////////////////////
+
+// TODO:: This needs to be fixed to reflect changes in Instruction Class
         // Writes out all instructions contained in a block 
         public static void WriteBlock(BasicBlock block) {
             Instruction currInstr = block.firstInstruction;

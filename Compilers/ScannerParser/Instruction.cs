@@ -11,12 +11,12 @@ namespace ScannerParser {
         public Instruction[] neededInstr; // instructions whose values this instruction needs
         public Instruction next;
         public Instruction prev;
-        public BasicBlock myBoundingBlock{private set; get;}
+        public BasicBlock myBasicBlock{private set; get;}
         private string actualInstruction; // i.e mul x_1 #3 --- DOES NOT CONTAIN LINE NUMBER
 
         public Instruction(int instructionNumber, BasicBlock myBB){
             instructionNum = instructionNumber;
-            myBoundingBlock = myBB;
+            myBasicBlock = myBB;
             neededInstr = new Instruction[2];
             next = null;
             prev = null;
@@ -29,7 +29,7 @@ namespace ScannerParser {
         }
 
         public void AddToBoundingBlock(BasicBlock bb) {
-            myBoundingBlock = bb;
+            myBasicBlock = bb;
         }
 
         public override string ToString() {

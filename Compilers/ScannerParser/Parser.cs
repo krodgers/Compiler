@@ -199,6 +199,10 @@ namespace ScannerParser {
             scanner.Error(msg);
         }
 
+        private void Error(String msg) {
+            scanner.Error(msg);
+        }
+
         //private string relation() {
         //    Result ResA = Expression();
         //    Result ResOp = RelOp();
@@ -309,7 +313,7 @@ namespace ScannerParser {
         // TODO:: Handle Arrays correctly --> getting address when needed
 
         private int[] GetArrayDimensions(string arrayName) {
-            Symbol currSym = symbolTable[scanner.String2Id(arrayName)];
+            ArraySymbol currSym = (ArraySymbol) symbolTable[scanner.String2Id(arrayName)];
             if (currSym == null || !currSym.IsInScope(scopes.Peek()) || !currSym.IsGlobal()) {
                 scanner.Error(String.Format("{1}: Array {0} not in scope", arrayName, AssemblyPC));
                 return null;
@@ -328,10 +332,7 @@ namespace ScannerParser {
 
             if (scannerSym == Token.OPENBRACKET) {
                 Next(); // eat [
-
                 res = MakeArrayReference(res);
-
-
                 VerifyToken(Token.CLOSEBRACKET, "Designator: Unmatched [.... missing ]");
                 Next();
 
@@ -352,6 +353,7 @@ namespace ScannerParser {
       
         private Result FuncCall() {
             Result res = null;
+            FunctionSymbol currentFunction;
             List<Result> optionalArguments = null;
 
             VerifyToken(Token.CALL, "Ended up at FuncCall but didn't recieve the keyword call");
@@ -363,6 +365,7 @@ namespace ScannerParser {
 
                     // Verify function is in scope
                     if (CheckScope(scanner.String2Id(res.GetValue()))) {
+                        currentFunction = (FunctionSymbol)symbolTable[scanner.String2Id(res.GetValue())];
                         // Parse arguments
                         if (scannerSym == Token.OPENPAREN) {
                             Next();
@@ -373,7 +376,6 @@ namespace ScannerParser {
                                     Console.WriteLine("WARNING:{0}: Got Null argument in Function Argument ", AssemblyPC);
                                 }
                                 optionalArguments.Add(currArg);
-                                // TODO:: Need to store the function's offset somewhere -- done - in Symbol Class
                                 SSAWriter.StoreFunctionArgument(currArg, AssemblyPC);
                                 // Set the value of the arguments
                                 int ID = scanner.String2Id(currArg.GetValue());
@@ -408,7 +410,10 @@ namespace ScannerParser {
 
                         }
 
-                        // branch to function
+                        if (optionalArguments.Count != currentFunction.numberOfFormalParamters)
+                            Error(String.Format("{0}: Wrong number of parameters for {1}", AssemblyPC, scanner.Id2String(currentFunction.identID)));
+
+                            // branch to function
                         SSAWriter.FunctionEntry(res, AssemblyPC++);
                      
                         if (symbolTable[scanner.String2Id(res.GetValue())].type == Token.FUNC) {
@@ -468,10 +473,6 @@ namespace ScannerParser {
                     break;
 
             }
-
-            //if (scannerSym == Token.SEMI)
-              //  Next(); // eat the semicolon // if semi exists, means there's another statement coming
-
 
             // TODO:: What to return here if the function doesn't return anything?
             return res;
@@ -773,8 +774,9 @@ namespace ScannerParser {
                 int variID = scanner.String2Id(variableToLoad.GetValue());
                 Symbol curSymbol = symbolTable[variID];
 
-                int offset = symbolTable[variID].GetFunctionArgumentOffset();
-                if (offset != 0 && curSymbol.IsInScope(scopes.Peek())) {
+                if (curSymbol.GetType() == typeof(FunctionArgumentSymbol) && curSymbol.IsInScope(scopes.Peek())) {
+                    FunctionArgumentSymbol argSym =  (FunctionArgumentSymbol) curSymbol;
+                    int offset = argSym.GetFunctionArgumentOffset();
                     res = SSAWriter.LoadFunctionArgument(offset, variableToLoad, AssemblyPC);
                     UpdateSymbol(curSymbol, res);
                     AssemblyPC += 1;
@@ -812,7 +814,7 @@ namespace ScannerParser {
             return res;
         }
 
-        // TODO:: Functions must have a return statement
+
         private void Main() {
             if (VerifyToken(Token.MAIN, "Missing Main Function")) {// find "main"
                 Next();
@@ -857,15 +859,15 @@ namespace ScannerParser {
 
             VerifyToken(Token.IDENT, "Function/Procedure declaration missing a name");
             
-            Symbol function;
+            FunctionSymbol function;
             if (scopes.Peek() == 1) { // function is in global scope as well as local scope
-                function = new Symbol(funcType, scanner.id, AssemblyPC, scopes.Peek());
+                function = new FunctionSymbol(funcType, scanner.id, AssemblyPC, scopes.Peek());
                 scopes.Push(nextScopeNumber++);
                 // function should be able to be called from anywhere
                 function.AddScope(scopes.Peek());
             } else {
                 scopes.Push(nextScopeNumber++);
-                function = new Symbol(funcType, scanner.id, AssemblyPC, scopes.Peek());
+                function = new FunctionSymbol(funcType, scanner.id, AssemblyPC, scopes.Peek());
             }
             AddToSymbolTable(function, scopes.Peek());
 
@@ -881,19 +883,19 @@ namespace ScannerParser {
                 if (scannerSym == Token.IDENT) {
                     //                    Ident();
                     Next(); // eat ident
-                    Symbol sym = new Symbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek());
-                    sym.SetArgumentOffset(currentOffset);
+                    Symbol sym = new FunctionArgumentSymbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek(), currentOffset);
                     currentOffset -= 4;
                     AddToSymbolTable(sym, scopes.Peek());
+                    function.numberOfFormalParamters++;
 
                     while (scannerSym == Token.COMMA) {
                         Next();
                         //                      Ident();
                         Next(); // eat Ident
-                        sym = new Symbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek());
-                        sym.SetArgumentOffset(currentOffset);
+                        sym = new FunctionArgumentSymbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek(), currentOffset);
                         currentOffset -= 4;
                         AddToSymbolTable(sym, scopes.Peek());
+                        function.numberOfFormalParamters++;
                     }
                 }
                 VerifyToken(Token.CLOSEPAREN, "Function Declaration missing a closing parenthesis");
@@ -1086,7 +1088,7 @@ namespace ScannerParser {
                 } while (scannerSym != Token.IDENT);
 
                 VerifyToken(Token.IDENT, "Array declaration missing name");
-                AddToSymbolTable(new Symbol(Token.ARR, scanner.id, AssemblyPC, dims.ToArray(), scopes.Peek()), scopes.Peek());
+                AddToSymbolTable(new ArraySymbol(Token.ARR, scanner.id, AssemblyPC, dims.ToArray(), scopes.Peek()), scopes.Peek());
 
                 Next(); // eat ident
 

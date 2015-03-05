@@ -8,35 +8,20 @@ namespace ScannerParser {
 
     public class Symbol {
 
-        public Token type{private set; get;} // what this symbol is, VAR, FUNC, PROC, ARR ...
+        public Token type{protected set; get;} // what this symbol is, VAR, FUNC, PROC, ARR ...
         public int currLineNumber {  set; get; } // the last line number this variable seen on
-        public int identID { private set; get; }
-       
-        private int[] arrDims;// for if it's an array
-        private Dictionary<int, Result> validScopes; // scope is key, value is value of the symbol in the scope
-        private int functionOffset; // if the symbol is a function argument, its offset from FP (-4, -8...)
+        public int identID { protected set; get; }
+        protected Dictionary<int, Result> validScopes; // scope is key, value is value of the symbol in the scope
 
         // Constructor 
         public Symbol(Token whatAmI, int ID, int lineNum, int scope) {
             type = whatAmI;
             currLineNumber = lineNum;
             identID = ID;
-            arrDims = null;
             validScopes = new Dictionary<int, Result>();
             validScopes.Add(scope, null);
-            functionOffset = 0;
-
         }
 
-        public Symbol(Token whatAmI, int ID, int lineNum, int[] arrayDimensions, int scope) {
-            type = whatAmI;
-            currLineNumber = lineNum;
-            identID = ID;
-            arrDims = arrayDimensions;
-            validScopes = new Dictionary<int, Result>();
-            validScopes.Add(scope, null);
-            functionOffset = 0;
-        }
 
         // Accessors
         // Returns true if this identifier is valid in this particular scope
@@ -51,16 +36,7 @@ namespace ScannerParser {
             return validScopes.ContainsKey(1);
         }
         
-        // If it's an array, returns the dimensions
-        // returns an empty array otherwise
-        public int[] GetArrayDimensions() {
-            if (type == Token.ARR) {
-                return arrDims;
-            } else {
-                return new int[0];
-            }
-
-        }
+       
 
         // Returns the last stored value of this symbol in the given scope
         // returns null if the scope isn't valid or symbol hasn't been given a value
@@ -73,17 +49,6 @@ namespace ScannerParser {
             }
 
         }
-
-// Returns 0 if it doesn't have an offset
-        public int GetFunctionArgumentOffset() {
-            if (type == Token.VAR) {
-                return functionOffset;
-            } else {
-                Console.WriteLine("WARNING: {0} shouldn't have an argument offset", type);
-                return 0;
-            }
-        }
-
 
         // Utilities
         // Add a valid scope to this symbol
@@ -102,15 +67,6 @@ namespace ScannerParser {
             }
         }
         
-        public void SetArgumentOffset(int offset) {
-            if (offset > 0) {
-                Console.WriteLine("WARNING: Setting positive argument offset");
-            }
-            if (type != Token.VAR) {
-                Console.WriteLine("WARNING: Setting an offset for {0}", type);
-            }
-            functionOffset = offset;
-        }
 
       
 
