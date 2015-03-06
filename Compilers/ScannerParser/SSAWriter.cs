@@ -163,8 +163,8 @@ namespace ScannerParser {
             Console.WriteLine("{0}: adda {1} {2}", lineNumber, currentResult.GetValue(), arrayBase.GetValue());
             sw.WriteLine("{0}: adda {1} {2}", lineNumber++, currentResult.GetValue(), arrayBase.GetValue());
             
-            Console.WriteLine("{0}: load ({0})", lineNumber, lineNumber -1);
-            sw.WriteLine("{0}: load ({0})", lineNumber, lineNumber - 1);
+            Console.WriteLine("{0}: load ({1})", lineNumber, (lineNumber - 1));
+            sw.WriteLine("{0}: load ({1})", lineNumber, (lineNumber - 1));
             lineNumber += 1;
 
             return lineNumber;

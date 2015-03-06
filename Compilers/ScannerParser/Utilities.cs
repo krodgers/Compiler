@@ -43,6 +43,7 @@ namespace ScannerParser {
                 }
 
             }
+            sr.Dispose();
             Console.WriteLine("Passed");
         }
 
