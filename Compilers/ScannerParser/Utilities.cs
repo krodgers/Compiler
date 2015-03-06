@@ -15,7 +15,7 @@ namespace ScannerParser {
 // Do not put line numbers in expected
 // example : string[] expected  = {"mul", "i", "j"} when you want "1: mul i j"
 // filename - the name of the file to use for comparing to expected
-        public static void CheckFile(string filename, string[] expected) {
+        public static bool CheckFile(string filename, string[] expected) {
             StreamReader sr = new StreamReader(new FileStream(filename, FileMode.Open, FileAccess.Read));
             string result = sr.ReadToEnd();
             string[] delims = { " ", "\n", "\r\n", "1:", "2:", "3:", "4:", "5:", "6:", "7:", "8:", "9:", "0:" };
@@ -39,12 +39,13 @@ namespace ScannerParser {
 
                     Console.WriteLine("Got: {0} {1} {2} Wanted: {3} {4} {5}", splittedString[0], splittedString[1], splittedString[2], expectedString[0], expectedString[1], expectedString[2]);
                     sr.Dispose();
-                    return;
+                    return false;
                 }
 
             }
             sr.Dispose();
             Console.WriteLine("Passed");
+            return true;
         }
 
     }
