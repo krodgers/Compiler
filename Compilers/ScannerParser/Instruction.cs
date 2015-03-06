@@ -12,6 +12,7 @@ namespace ScannerParser {
         public Instruction next;
         public Instruction prev;
         public BasicBlock myBasicBlock{private set; get;}
+        Token myOpcode;
         private string actualInstruction; // i.e mul x_1 #3 --- DOES NOT CONTAIN LINE NUMBER
 
         public Instruction(int instructionNumber, BasicBlock myBB){

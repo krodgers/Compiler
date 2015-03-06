@@ -81,10 +81,9 @@ namespace ScannerParser {
 
         ~Parser() {
             try {
+              
                 if (SSAWriter.sw != null)
-                    SSAWriter.sw.Close();
-                if (fs != null)
-                    fs.Close();
+                    SSAWriter.sw.Dispose(); // closes sw and fs
             } catch (Exception) {
                 Console.WriteLine("File may not be closed properly....");
             }
@@ -203,34 +202,7 @@ namespace ScannerParser {
             scanner.Error(msg);
         }
 
-        //private string relation() {
-        //    Result ResA = Expression();
-        //    Result ResOp = RelOp();
-        //    Result ResB = Expression();
-        //    return CombineRelation(ResA, ResB, ResOp);
-        //}
-        //private string CombineRelation(Result A, Result B, Result Op) {
-        //    string res;
-
-
-        //    if (A.type == Kind.CONST && B.type == Kind.CONST) {
-        //        switch (Op.condition) {
-        //             case CondOp.EQ:
-        //                return (A.GetValue() == B.GetValue()).ToString();
-        //            break;
-        //                // TODO:: Rest of options
-
-        //        }
-
-        //    }
-        //    else if (A.type == Kind.VAR && B.type == Kind.VAR) {
-        //        return string.Format("cmp {0}, {1}, {2}", );
-        //    }
-
-
-        //    return ":D";
-        //}
-
+        
         private Result Expression() {
             Result res;
             Result res2;

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ScannerParser {
     public enum Kind { VAR, COND, BRA, REG, CONST, ARR };
-    public enum CondOp { GT, LT, LEQ, GEQ, EQ, NEQ, ERR };
+    public enum CondOp { GT=-200, LT, LEQ, GEQ, EQ, NEQ, ERR };
     public enum ConstantType { STRING, INT, DOUBLE, BOOLEAN, ADDR};
 
   public  class Result {
@@ -61,14 +61,14 @@ namespace ScannerParser {
        // Conditional result
         public Result(Kind myType, CondOp op) {
             if (myType != Kind.COND) {
-                Console.WriteLine("WARNING: Initializing Result with wrong value type");
+                Console.WriteLine("WARNING: Initializing Result with wrong value type; Expecting Conditional");
             }
             type = myType;
             condition = op;
         }
         public Result(Kind myType, CondOp op, int myLine) {
             if (myType != Kind.COND) {
-                Console.WriteLine("WARNING: Initializing Result with wrong value type");
+                Console.WriteLine("WARNING: Initializing Result with wrong value type Expecting Conditional");
             }
             type = myType;
             condition = op;
@@ -77,7 +77,7 @@ namespace ScannerParser {
 
         public Result(Kind myType, double myValue) {
             if (myType != Kind.CONST)
-                Console.WriteLine("WARNING: Initializing Result with wrong value type");
+                Console.WriteLine("WARNING: Initializing Result with wrong value type: Expecting CONST");
             type = myType;
             valueD = myValue;
             constantType = ConstantType.DOUBLE;
@@ -94,15 +94,18 @@ namespace ScannerParser {
             else if (myType == Kind.REG) {
                 type = myType;
                 regName = myValue;
+            } else if (myType == Kind.ARR) {
+                type = myType;
+                arrBase = myValue;
             }
             else {
-                Console.WriteLine("WARNING: Initializing Result with wrong value type");
+                Console.WriteLine("WARNING: Initializing Result with wrong value type: Expectiong CONST, VAR, ARR, or REG");
             }
 
         }
         public Result(Kind myType, bool myValue) {
             if (myType != Kind.COND)
-                Console.WriteLine("WARNING: Initializing Result with wrong value type");
+                Console.WriteLine("WARNING: Initializing Result with wrong value type: Expecting COND");
             type = myType;
             valueB = myValue;
 
