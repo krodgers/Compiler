@@ -32,7 +32,7 @@ namespace ScannerParser {
 
         }
 
-        public Instruction(int instructionNumber, BasicBlock myBB, string opCode, string firstOperand, string secondOperand) {
+        public Instruction(int instructionNumber, BasicBlock myBB, Token opCode, string firstOperand, string secondOperand) {
             neededInstr = new Instruction[2];
             this.opCode = opCode;
             this.firstOperand = firstOperand;
