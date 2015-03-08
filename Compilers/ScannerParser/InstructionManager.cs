@@ -24,7 +24,7 @@ namespace ScannerParser {
             return curBasicBlock;
         }
 
-        public void PutBasicInstruction(string opCode, Result a, Result b, int lineNumber) {
+        public void PutBasicInstruction(Token opCode, Result a, Result b, int lineNumber) {
 
 
             // Initialize all of the non-pointer fields for the instruction
@@ -59,7 +59,7 @@ namespace ScannerParser {
 
         public void PutLoadInstruction(Result itemToLoad, int lineNumber) {
             Instruction tmp = new Instruction(lineNumber, curBasicBlock);
-            tmp.opCode = "load";
+            tmp.opCode = Token.LOAD;
 
             tmp.firstOperand = itemToLoad.GetValue();
             if (itemToLoad.GetValue().Contains("(")) {
@@ -80,7 +80,7 @@ namespace ScannerParser {
 
         public void PutProcedureReturn(int lineNumber) {
             Instruction tmp = new Instruction(lineNumber, curBasicBlock);
-            tmp.opCode = "ret";
+            tmp.opCode = Token.RETURN;
 
             // Add the new instruction to the dictionary of all instructions
             instructionDictionary.Add(lineNumber, tmp);
@@ -91,7 +91,7 @@ namespace ScannerParser {
 
         public void PutFunctionReturn(Result res, int lineNumber) {
             Instruction tmp = new Instruction(lineNumber, curBasicBlock);
-            tmp.opCode = "ret";
+            tmp.opCode = Token.RETURN;
 
             tmp.firstOperand = res.GetValue();
             if (res.GetValue().Contains("(")) {
@@ -111,7 +111,7 @@ namespace ScannerParser {
 
         public void PutFunctionArgument(Result argument, int lineNumber) {
             Instruction tmp = new Instruction(lineNumber, curBasicBlock);
-            tmp.opCode = "sub";
+            tmp.opCode = Token.MINUS;
 
             tmp.firstOperand = "#4";
             tmp.firstOperandType = Instruction.OperandType.CONSTANT;
@@ -125,13 +125,13 @@ namespace ScannerParser {
             // Initialize all of the pointer fields for the instruction
             InsertAndLink(tmp);
 
-            PutBasicInstruction("store", argument, new Result(Kind.REG, String.Format("({0})", lineNumber)), lineNumber + 1);
+            PutBasicInstruction(Token.STORE, argument, new Result(Kind.REG, String.Format("({0})", lineNumber)), lineNumber + 1);
 
         }
 
         public void PutFunctionEntry(Result function, int lineNumber) {
             Instruction tmp = new Instruction(lineNumber, curBasicBlock);
-            tmp.opCode = "bra";
+            tmp.opCode = Token.BRANCH;
 
             tmp.firstOperand = function.GetValue().ToUpper();
             tmp.firstOperandType = KindToOperandType(function);
@@ -145,10 +145,34 @@ namespace ScannerParser {
 
         public void PutFunctionLeave(int lineNumber) {
             Instruction tmp = new Instruction(lineNumber, curBasicBlock);
-            tmp.opCode = "bra";
+            tmp.opCode = Token.BRANCH;
 
             tmp.firstOperand = "$RA";
             tmp.firstOperandType = Instruction.OperandType.REG; 
+
+            // Add the new instruction to the dictionary of all instructions
+            instructionDictionary.Add(lineNumber, tmp);
+
+            // Initialize all of the pointer fields for the instruction
+            InsertAndLink(tmp);
+        }
+
+        public void PutConditionalBranch(Token opCode, Result condResult, string label, int lineNumber)
+        {
+            Instruction tmp = new Instruction(lineNumber, curBasicBlock);
+            tmp.opCode = opCode;
+
+            tmp.firstOperand = condResult.GetValue();
+            if (condResult.GetValue().Contains("(")) {
+                tmp.firstOperandSSAVal = GetNumFromSSAReg(condResult.GetValue());
+                tmp.firstOperandType = Instruction.OperandType.SSA_VAL;
+            }
+            else {
+                tmp.firstOperandType = KindToOperandType(condResult);
+            }
+
+            tmp.secondOperand = label;
+            tmp.secondOperandType = Instruction.OperandType.LABEL;
 
             // Add the new instruction to the dictionary of all instructions
             instructionDictionary.Add(lineNumber, tmp);

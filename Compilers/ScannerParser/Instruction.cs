@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ScannerParser {
     public class Instruction {
-        public enum OperandType {SSA_VAL, CONSTANT, REG, VAR, IDENT, BRANCH, ERROR}
+        public enum OperandType {SSA_VAL, CONSTANT, REG, VAR, IDENT, BRANCH, LABEL, ERROR}
         public Result myResult;
         public int instructionNum { private set;  get; }
         public Instruction[] neededInstr; // instructions whose values this instruction needs
@@ -32,7 +32,7 @@ namespace ScannerParser {
 
         }
 
-        public Instruction(int instructionNumber, BasicBlock myBB, string opCode, string firstOperand, string secondOperand) {
+        public Instruction(int instructionNumber, BasicBlock myBB, Token opCode, string firstOperand, string secondOperand) {
             neededInstr = new Instruction[2];
             this.opCode = opCode;
             this.firstOperand = firstOperand;
