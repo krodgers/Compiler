@@ -6,14 +6,14 @@ using System.Threading.Tasks;
 
 namespace ScannerParser {
     public class Instruction {
-        public enum OperandType {SSA_VAL, CONSTANT, REG, VAR, IDENT, BRANCH, ERROR}
+        public enum OperandType {SSA_VAL, CONSTANT, REG, VAR, IDENT, BRANCH, LABEL, ERROR}
         public Result myResult;
         public int instructionNum { private set;  get; }
         public Instruction[] neededInstr; // instructions whose values this instruction needs
         public Instruction next;
         public Instruction prev;
         public BasicBlock myBasicBlock{private set; get;}
-        public string opCode;
+        public Token opCode;
         public string firstOperand;
         public OperandType? firstOperandType;
         public string secondOperand;
