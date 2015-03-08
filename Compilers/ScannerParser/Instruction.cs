@@ -6,14 +6,21 @@ using System.Threading.Tasks;
 
 namespace ScannerParser {
     public class Instruction {
+        public enum OperandType {SSA_VAL, CONSTANT, REG, VAR, IDENT, BRANCH, ERROR}
         public Result myResult;
         public int instructionNum { private set;  get; }
         public Instruction[] neededInstr; // instructions whose values this instruction needs
         public Instruction next;
         public Instruction prev;
         public BasicBlock myBasicBlock{private set; get;}
-        Token myOpcode;
-        private string actualInstruction; // i.e mul x_1 #3 --- DOES NOT CONTAIN LINE NUMBER
+        public string opCode;
+        public string firstOperand;
+        public OperandType? firstOperandType;
+        public string secondOperand;
+        public OperandType? secondOperandType;
+        public int firstOperandSSAVal;
+        public int secondOperandSSAVal;
+
 
         public Instruction(int instructionNumber, BasicBlock myBB){
             instructionNum = instructionNumber;
@@ -21,11 +28,18 @@ namespace ScannerParser {
             neededInstr = new Instruction[2];
             next = null;
             prev = null;
+            secondOperandType = null;
+
         }
 
-        public Instruction(int instructionNumber, BasicBlock myBB, string instructionText) {
+        public Instruction(int instructionNumber, BasicBlock myBB, string opCode, string firstOperand, string secondOperand) {
             neededInstr = new Instruction[2];
-            actualInstruction = instructionText;
+            this.opCode = opCode;
+            this.firstOperand = firstOperand;
+            this.secondOperand = secondOperand;
+            instructionNum = instructionNumber;
+            myBasicBlock = myBB;
+            secondOperandType = null;
 
         }
 
@@ -34,12 +48,7 @@ namespace ScannerParser {
         }
 
         public override string ToString() {
-            return String.Format("{0}: {1}", instructionNum, actualInstruction);
-        }
-
-        // sets what the instruction that would be printed out is
-        public void SetActualInstruction(String instruction) {
-            actualInstruction = instruction;
+            return String.Format("{0}: {1} {2} {3}", instructionNum, opCode, firstOperand, secondOperand);
         }
 
 

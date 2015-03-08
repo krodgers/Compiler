@@ -89,6 +89,20 @@ namespace ScannerParser {
             Console.WriteLine("{0}: bra $RA", lineNumber);
         }
 
+        public static Result PutCompare(string opCode, Result a, Result b, int lineNumber)
+        {
+            PutInstruction(opCode, a.GetValue(), b.GetValue(), lineNumber);
+            Result res = new Result(Kind.REG, String.Format("({0})", lineNumber));
+
+            return res;
+        }
+
+        public static void PutConditionalBranch(string opCode, Result condResult, string label, int lineNumber)
+        {
+            sw.WriteLine("{0}: {1} {2} {3}", lineNumber, opCode, condResult.GetValue(), label);
+            Console.WriteLine("{0}: {1} {2} {3}", lineNumber, opCode, condResult.GetValue(), label);
+        }
+
 
         //////////////////////////////////////////////
         // Memory Instructions

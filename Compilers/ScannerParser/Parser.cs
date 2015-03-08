@@ -34,9 +34,12 @@ namespace ScannerParser {
         private int currRegister;
         private int AssemblyPC;
         private BasicBlock rootBasicBlock;
-        private BasicBlock curBasicBlock;
+        private BasicBlock entryBlock;
+        public BasicBlock curBasicBlock;
         private int nextBBid; // next available basic block id
         private Stack<BasicBlock> parentBlocks;
+
+        private InstructionManager instructionManager;
 
         private Stack<int> scopes; // track the current scope
         private int nextScopeNumber; // next assignable scope number
@@ -44,10 +47,11 @@ namespace ScannerParser {
         private List<Symbol> symbolTable; // all the symbols! // indexed by symbol id
 
         private Stack<BasicBlock> joinBlocks;
-        private Stack<BasicBlock> loopHeaderBlocks;
+        private Stack<BasicBlock> loopBodyBlocks;
         private int globalNestingLevel;
         BasicBlock trueBlock, falseBlock, joinBlock;
         Dictionary<int, BasicBlock> flowGraphNodes;
+
 
 
         public Parser(String file) {
@@ -65,7 +69,9 @@ namespace ScannerParser {
             nextScopeNumber = 2;
 
             joinBlocks = new Stack<BasicBlock>();
-            loopHeaderBlocks = new Stack<BasicBlock>();
+            loopBodyBlocks = new Stack<BasicBlock>();
+
+            instructionManager = new InstructionManager();
 
             globalNestingLevel = 0;
             trueBlock = falseBlock = joinBlock = null;
@@ -96,101 +102,30 @@ namespace ScannerParser {
         }
 
         public void StartFirstPass() {
+
+            entryBlock = new BasicBlock(nextBBid++);
+            entryBlock.blockLabel = "ENTRY:";
+            flowGraphNodes[entryBlock.blockNum] = entryBlock;
+            entryBlock.childBlocks = new List<BasicBlock>();
+            entryBlock.parentBlocks = new List<BasicBlock>();
+            entryBlock.blockType = BasicBlock.BlockType.ENTRY;
+
             rootBasicBlock = new BasicBlock(nextBBid++);
+            rootBasicBlock.blockLabel = "MAIN:";
             flowGraphNodes[rootBasicBlock.blockNum] = rootBasicBlock;
             rootBasicBlock.childBlocks = new List<BasicBlock>();
             rootBasicBlock.parentBlocks = new List<BasicBlock>();
             rootBasicBlock.nestingLevel = globalNestingLevel;
+            rootBasicBlock.blockType = BasicBlock.BlockType.STANDARD;
+            entryBlock.childBlocks.Add(rootBasicBlock);
             curBasicBlock = rootBasicBlock;
+            instructionManager.setCurrentBlock(curBasicBlock);
+
+            instructionManager.setCurrentBlock(curBasicBlock);
 
             Main();
         }
 
-        private void HandleToken() {
-            switch (scannerSym) {
-                #region Symbol Case Statements
-                case Token.ERROR:
-                    Error();
-                    break;
-                case Token.TIMES:
-                    break;
-                case Token.DIV:
-                    break;
-                case Token.PLUS:
-                    break;
-                case Token.MINUS:
-                    break;
-                case Token.EQL:
-                    break;
-                case Token.NEQ:
-                    break;
-                case Token.LSS:
-                    break;
-                case Token.GEQ:
-                    break;
-                case Token.LEQ:
-                    break;
-                case Token.GTR:
-                    break;
-                case Token.PERIOD:
-                    break;
-                case Token.COMMA:
-                    break;
-                case Token.OPENBRACKET:
-                    break;
-                case Token.CLOSEBRACKET:
-                    break;
-                case Token.CLOSEPAREN:
-                    break;
-                case Token.BECOMES:
-                    break;
-                case Token.THEN:
-                    break;
-                case Token.DO:
-                    break;
-                case Token.OPENPAREN:
-                    break;
-                case Token.NUMBER:
-                    break;
-                case Token.IDENT:
-                    break;
-                case Token.SEMI:
-                    break;
-                case Token.END:
-                    break;
-                case Token.OD:
-                    break;
-                case Token.FI:
-                    break;
-                case Token.ELSE:
-                    break;
-                case Token.LET:
-                    break;
-                case Token.CALL:
-                    break;
-                case Token.IF:
-                    break;
-                case Token.WHILE:
-                    break;
-                case Token.RETURN:
-                    break;
-                case Token.VAR:
-                    break;
-                case Token.ARR:
-                    break;
-                case Token.FUNC:
-                    break;
-                case Token.PROC:
-                    break;
-                case Token.BEGIN:
-                    break;
-                case Token.MAIN:
-                    break;
-                case Token.EOF:
-                    break;
-                #endregion
-            }
-        }
 
         private void Error() {
             string msg;
@@ -233,13 +168,15 @@ namespace ScannerParser {
                     if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER) {
                         resB = Factor();
                         res = Combine(tmp, res, resB);
-                    } else {
+                    }
+                    else {
                         scanner.Error("Reached Term but don't have an Identifier or Number");
                     }
 
                 }
 
-            } else {
+            }
+            else {
                 scanner.Error("Reached Term but don't have an Identifier or Number");
             }
             return res;
@@ -252,10 +189,12 @@ namespace ScannerParser {
                 if (res == null)
                     Console.WriteLine("{0}: Factor got null res", AssemblyPC);
 
-            } else if (scannerSym == Token.NUMBER) {
+            }
+            else if (scannerSym == Token.NUMBER) {
                 res = new Result(Kind.CONST, Number().GetValue());
 
-            } else if (scannerSym == Token.CALL) {
+            }
+            else if (scannerSym == Token.CALL) {
                 // TODO:: where to put the result of a function call?
                 res = FuncCall();
                 // TODO:: THis might be a hack
@@ -264,14 +203,17 @@ namespace ScannerParser {
                     //TODO:: Something here
                 }
 
-            } else if (scannerSym == Token.OPENPAREN) {
+            }
+            else if (scannerSym == Token.OPENPAREN) {
                 Next();
                 res = Expression();
                 if (scannerSym == Token.CLOSEPAREN) {
                     Next();
-                } else {
+                }
+                else {
                     // todo, evaluate when this happens
                     if (res.type == Kind.VAR || res.type == Kind.REG) {
+                    	instructionManager.PutLoadInstruction(res, AssemblyPC);
                         res = SSAWriter.LoadVariable(res, AssemblyPC);
                         AssemblyPC++;
                     } else if (res.type == Kind.ARR) {
@@ -350,6 +292,8 @@ namespace ScannerParser {
                                     Console.WriteLine("WARNING:{0}: Got Null argument in Function Argument ", AssemblyPC);
                                 }
                                 optionalArguments.Add(currArg);
+                                // TODO:: Need to store the function's offset somewhere -- done - in Symbol Class
+                                instructionManager.PutFunctionArgument(currArg, AssemblyPC);
                                 SSAWriter.StoreFunctionArgument(currArg, AssemblyPC);
                                 // Set the value of the arguments
                                 int ID = scanner.String2Id(currArg.GetValue());
@@ -368,6 +312,7 @@ namespace ScannerParser {
                                     Result currArg = Expression();
                                     optionalArguments.Add(currArg);
                                     // TODO:: Need to store the function's offset somewhere, i.e which argument is it
+                                    instructionManager.PutFunctionArgument(currArg, AssemblyPC);
                                     SSAWriter.StoreFunctionArgument(currArg, AssemblyPC);
                                     // Set the value of the arguments
                                     int ID = scanner.String2Id(currArg.GetValue());
@@ -388,12 +333,14 @@ namespace ScannerParser {
 
                         
                         // branch to function
+                        instructionManager.PutFunctionEntry(res, AssemblyPC);
                         SSAWriter.FunctionEntry(res, AssemblyPC++);
 
                         if (symbolTable[scanner.String2Id(res.GetValue())].type == Token.FUNC) {
                             res = new Result(Kind.REG, "EAX"); // going to call return register EAX
                         }
-                    } else {
+                    }
+                    else {
                         scanner.Error(String.Format("Tried to call an undefined function : {0}", res.GetValue()));
                     }
                     break;
@@ -468,9 +415,10 @@ namespace ScannerParser {
                     res = Relation();
                     if (VerifyToken(Token.THEN, "The then keyword did not follow the relation in if statement")) {
                         if (res.condition != CondOp.ERR) {
-                            string negatedTokenString = TokenToInstruction(NegatedConditional(res.condition));
+                            //string negatedTokenString = TokenToInstruction(NegatedConditional(res.condition));
                             //PutF1(negatedTokenString, res, new Result(Kind.CONST, "offset")); //todo, need to fix for new PutF1 stuff
-                        } else {
+                        }
+                        else {
                             scanner.Error("The relation in the if did not contain a valid conditional operator");
                         }
 
@@ -480,10 +428,12 @@ namespace ScannerParser {
 
                         bool elseOccurred = false;
                         BasicBlock joinBlock = new BasicBlock(nextBBid++);
+                        joinBlock.blockLabel = GetLabel(joinBlock, curBasicBlock.blockNum);
                         flowGraphNodes[joinBlock.blockNum] = joinBlock;
                         joinBlock.childBlocks = new List<BasicBlock>();
                         joinBlock.parentBlocks = new List<BasicBlock>();
                         joinBlock.nestingLevel = globalNestingLevel;
+                        joinBlock.blockType = BasicBlock.BlockType.JOIN;
                         joinBlocks.Push(joinBlock);
 
                         globalNestingLevel++;
@@ -491,31 +441,39 @@ namespace ScannerParser {
                         Next();
                         parentBlocks.Push(curBasicBlock);
                         BasicBlock trueBlock = new BasicBlock(nextBBid++);
+                        trueBlock.blockLabel = GetLabel(trueBlock, curBasicBlock.blockNum);
                         flowGraphNodes[trueBlock.blockNum] = trueBlock;
                         trueBlock.childBlocks = new List<BasicBlock>();
                         trueBlock.parentBlocks = new List<BasicBlock>();
+                        trueBlock.blockType = BasicBlock.BlockType.TRUE;
                         trueBlock.parentBlocks.Add(curBasicBlock);
                         //trueBlock.childBlocks.Add(joinBlock);
                         trueBlock.nestingLevel = globalNestingLevel;
                         curBasicBlock.childBlocks.Add(trueBlock);
                         curBasicBlock = trueBlock;
+                        instructionManager.setCurrentBlock(curBasicBlock);
                         StatSequence();
                         curBasicBlock = parentBlocks.Pop();
+                        instructionManager.setCurrentBlock(curBasicBlock);
 
                         BasicBlock falseBlock = null;
                         if (scannerSym == Token.ELSE) {
                             parentBlocks.Push(curBasicBlock);
                             falseBlock = new BasicBlock(nextBBid++);
+                            falseBlock.blockLabel = GetLabel(falseBlock, curBasicBlock.blockNum);
                             flowGraphNodes[falseBlock.blockNum] = falseBlock;
                             falseBlock.childBlocks = new List<BasicBlock>();
                             falseBlock.parentBlocks = new List<BasicBlock>();
                             falseBlock.parentBlocks.Add(curBasicBlock);
                             falseBlock.nestingLevel = globalNestingLevel;
+                            falseBlock.blockType = BasicBlock.BlockType.FALSE;
                             curBasicBlock.childBlocks.Add(falseBlock);
                             curBasicBlock = falseBlock;
+                            instructionManager.setCurrentBlock(curBasicBlock);
                             Next();
                             StatSequence();
                             curBasicBlock = parentBlocks.Pop();
+                            instructionManager.setCurrentBlock(curBasicBlock);
                             elseOccurred = true;
                         }
                         if (scannerSym == Token.FI) {
@@ -541,6 +499,7 @@ namespace ScannerParser {
                                 }
                             }
                             curBasicBlock = joinBlock;
+                            instructionManager.setCurrentBlock(curBasicBlock);
                             while (joinBlocks.Peek().blockNum > joinBlock.blockNum) {
                                 BasicBlock tmp = joinBlocks.Pop();
                                 tmp.childBlocks.Add(joinBlock);
@@ -548,7 +507,8 @@ namespace ScannerParser {
                             }
                             globalNestingLevel--;
                             Next();
-                        } else {
+                        }
+                        else {
                             scanner.Error("In the if statement and found no token that matches either an else or a then");
                         }
                     }
@@ -556,7 +516,8 @@ namespace ScannerParser {
 
                 }
 
-            } else {
+            }
+            else {
                 scanner.Error("Ended up at If Statement but didn't parse the if keyword");
             }
             // return new Result(); // todo, I don't have any idea what should be in this result, or if it's even needed
@@ -614,6 +575,7 @@ namespace ScannerParser {
                     AssemblyPC = SSAWriter.StoreArrayElement(res1, res2, GetArrayDimensions(res1.GetValue()), res1.GetArrayIndices(), AssemblyPC);
                     // TODO:: don't update symbol cause it kills everything anyways?
                 } else {
+                	instructionManager.PutBasicInstruction("mov", res2, res1, AssemblyPC);
                     SSAWriter.PutInstruction("mov", res2.GetValue(), res1.GetValue(), AssemblyPC);
                     AssemblyPC++;
                 
@@ -643,82 +605,161 @@ namespace ScannerParser {
             if (newA.type == Kind.VAR && newB.type == Kind.VAR) {
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
+                        instructionManager.PutBasicInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC);
                         res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
+                        // compare
+                        instructionManager.PutBasicInstruction("cmp", newA, newB, AssemblyPC);
+                        res = SSAWriter.PutCompare("cmp", newA, newB, AssemblyPC++);
+
+                        // branch
+                        Token newOP = NegatedConditional(opCode);
+                        string label = "FALSE_" + curBasicBlock.blockNum + ":";
+                        SSAWriter.PutConditionalBranch(TokenToInstruction(newOP), res, label, AssemblyPC);
                         break;
                 }
                 //PutF2(TokenToInstruction(opCode), loadednewA loadedB);
-            } else if (newA.type == Kind.VAR && newB.type == Kind.CONST) {
+            }
+            else if (newA.type == Kind.VAR && newB.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
+                        instructionManager.PutBasicInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC);
                         res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
+                        // compare
+                        instructionManager.PutBasicInstruction("cmp", newA, newB, AssemblyPC);
+                        res = SSAWriter.PutCompare("cmp", newA, newB, AssemblyPC++);
+
+                        // branch
+                        Token newOP = NegatedConditional(opCode);
+                        string label = "FALSE_" + curBasicBlock.blockNum + ":";
+                        SSAWriter.PutConditionalBranch(TokenToInstruction(newOP), res, label, AssemblyPC);
                         break;
                 }
                 //PutF1(TokenToInstruction(opCode) + "i", loadednewA B);
 
-            } else if (newA.type == Kind.REG && newB.type == Kind.CONST) {
+            }
+            else if (newA.type == Kind.REG && newB.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
+                        instructionManager.PutBasicInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC);
                         res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
+                        // compare
+                        instructionManager.PutBasicInstruction("cmp", newA, newB, AssemblyPC);
+                        res = SSAWriter.PutCompare("cmp", newA, newB, AssemblyPC++);
+
+                        // branch
+                        Token newOP = NegatedConditional(opCode);
+                        string label = "FALSE_" + curBasicBlock.blockNum + ":";
+                        SSAWriter.PutConditionalBranch(TokenToInstruction(newOP), res, label, AssemblyPC);
                         break;
                 }
                 //PutF1(TokenToInstruction(opCode) + "i", loadednewA B);
 
-            } else if (newA.type == Kind.VAR && newB.type == Kind.REG) {
+            }
+            else if (newA.type == Kind.VAR && newB.type == Kind.REG) {
                 // todo, fill in later because reg is weird right now
 
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
+                        instructionManager.PutBasicInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC);
                         res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
+                        // compare
+                        instructionManager.PutBasicInstruction("cmp", newA, newB, AssemblyPC);
+                        res = SSAWriter.PutCompare("cmp", newA, newB, AssemblyPC++);
+
+                        // branch
+                        Token newOP = NegatedConditional(opCode);
+                        string label = "FALSE_" + curBasicBlock.blockNum + ":";
+                        SSAWriter.PutConditionalBranch(TokenToInstruction(newOP), res, label, AssemblyPC);
                         break;
                 }
                 //PutF2(TokenToInstruction(opCode), loadednewA B);
 
-            } else if (newB.type == Kind.REG && newA.type == Kind.REG) {
+            }
+            else if (newB.type == Kind.REG && newA.type == Kind.REG) {
 
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
+                        instructionManager.PutBasicInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC);
                         res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
+                        // compare
+                        instructionManager.PutBasicInstruction("cmp", newA, newB, AssemblyPC);
+                        res = SSAWriter.PutCompare("cmp", newA, newB, AssemblyPC++);
+
+                        // branch
+                        Token newOP = NegatedConditional(opCode);
+                        string label = "FALSE_" + curBasicBlock.blockNum + ":";
+                        SSAWriter.PutConditionalBranch(TokenToInstruction(newOP), res, label, AssemblyPC);
                         break;
                 }
                 //PutF2(TokenToInstruction(opCode), loadednewB, loadedA);
-            } else if (newB.type == Kind.VAR && newA.type == Kind.CONST) {
+            }
+            else if (newB.type == Kind.VAR && newA.type == Kind.CONST) {
 
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
+                        instructionManager.PutBasicInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC);
                         res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), newB, newA, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
+                        // compare
+                        instructionManager.PutBasicInstruction("cmp", newA, newB, AssemblyPC);
+                        res = SSAWriter.PutCompare("cmp", newA, newB, AssemblyPC++);
+
+                        // branch
+                        Token newOP = NegatedConditional(opCode);
+                        string label = "FALSE_" + curBasicBlock.blockNum + ":";
+                        SSAWriter.PutConditionalBranch(TokenToInstruction(newOP), res, label, AssemblyPC);
                         break;
                 }
                 //PutF1(TokenToInstruction(opCode) + "i", loadednewB, A);
 
-            } else if (newB.type == Kind.VAR && newA.type == Kind.REG) {
+            }
+            else if (newB.type == Kind.VAR && newA.type == Kind.REG) {
 
                 switch (GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
+                        instructionManager.PutBasicInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC);
                         res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
+                        // compare
+                        instructionManager.PutBasicInstruction("cmp", newA, newB, AssemblyPC);
+                        res = SSAWriter.PutCompare("cmp", newA, newB, AssemblyPC++);
+
+                        // branch
+                        Token newOP = NegatedConditional(opCode);
+                        string label = "FALSE_" + curBasicBlock.blockNum + ":";
+                        SSAWriter.PutConditionalBranch(TokenToInstruction(newOP), res, label, AssemblyPC);
                         break;
                 }
                 //PutF2(TokenToInstruction(opCode), loadednewB, A);
 
-            } else if (newB.type == Kind.REG && newA.type == Kind.CONST) {
+            }
+            else if (newB.type == Kind.REG && newA.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
+                        instructionManager.PutBasicInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC);
                         res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), newB, newA, AssemblyPC++);
                         break;
                     case OpCodeClass.COMPARE:
+                        // compare
+                        instructionManager.PutBasicInstruction("cmp", newA, newB, AssemblyPC);
+                        res = SSAWriter.PutCompare("cmp", newA, newB, AssemblyPC++);
+
+                        // branch
+                        Token newOP = NegatedConditional(opCode);
+                        string label = "FALSE_" + curBasicBlock.blockNum + ":";
+                        SSAWriter.PutConditionalBranch(TokenToInstruction(newOP), res, label, AssemblyPC);
                         break;
                 }
 
@@ -761,13 +802,16 @@ namespace ScannerParser {
                 if (curSymbol.GetType() == typeof(FunctionArgumentSymbol) && curSymbol.IsInScope(scopes.Peek())) {
                     FunctionArgumentSymbol argSym = (FunctionArgumentSymbol)curSymbol;
                     int offset = argSym.GetFunctionArgumentOffset();
+                    instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
                     res = SSAWriter.LoadFunctionArgument(offset, variableToLoad, AssemblyPC);
                     UpdateSymbol(curSymbol, res);
                     AssemblyPC += 1;
 
-                } else if (curSymbol.IsGlobal() && curSymbol.GetCurrentValue(scopes.Peek()) == null) {
+                }
+                else if (curSymbol.IsGlobal() && curSymbol.GetCurrentValue(scopes.Peek()) == null) {
 
                     // Check if it's a global that hasn't been loaded yet
+                    instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
                     res = SSAWriter.LoadVariable(variableToLoad, AssemblyPC);
                     UpdateSymbol(curSymbol, res);
                     AssemblyPC += 1;
@@ -844,7 +888,8 @@ namespace ScannerParser {
             Token funcType = scannerSym;
             if (scannerSym == Token.FUNC || scannerSym == Token.PROC) {
                 Next();
-            } else {
+            }
+            else {
                 scanner.Error("Function Declaration missing function/ procedure keyword");
             }
 
@@ -856,7 +901,8 @@ namespace ScannerParser {
                 scopes.Push(nextScopeNumber++);
                 // function should be able to be called from anywhere
                 function.AddScope(scopes.Peek());
-            } else {
+            }
+            else {
                 scopes.Push(nextScopeNumber++);
                 function = new FunctionSymbol(funcType, scanner.id, AssemblyPC, scopes.Peek());
             }
@@ -911,6 +957,7 @@ namespace ScannerParser {
             VerifyToken(Token.SEMI, "Function declaration missing semicolon"); // end function declaration
             Next(); // eat ;
 
+            instructionManager.PutFunctionLeave(AssemblyPC);
             SSAWriter.LeaveFunction(AssemblyPC);
             AssemblyPC++;
             // current scope ends
@@ -964,9 +1011,13 @@ namespace ScannerParser {
             VerifyToken(Token.DO, "No do keyword after the relation in while statement");
             Next(); // eat do
             if (res.condition != CondOp.ERR) {
-                string negatedTokenString = TokenToInstruction(NegatedConditional(res.condition));
+                //string negatedTokenString = TokenToInstruction(NegatedConditional(res.condition));
                 //PutF1(negatedTokenString, res, new Result(Kind.CONST, "offset")); //todo, fix for new PutF1 stuff
 
+                /* todo, for the case when a loop immediately follows another loop with no instructions
+                   in between, we need to delete the empty block from the tree (curBasicBlock). Make sure that its
+                 * block num is exaclty one less than this one and that it is not the root basic block
+                */
                 BasicBlock loopHeaderBlock = new BasicBlock(nextBBid++);
                 flowGraphNodes[loopHeaderBlock.blockNum] = loopHeaderBlock;
                 loopHeaderBlock.childBlocks = new List<BasicBlock>();
@@ -975,7 +1026,6 @@ namespace ScannerParser {
                 loopHeaderBlock.parentBlocks.Add(curBasicBlock);
                 curBasicBlock.childBlocks.Add(loopHeaderBlock);
                 curBasicBlock = loopHeaderBlock;
-                loopHeaderBlocks.Push(curBasicBlock);
                 globalNestingLevel++;
 
                 BasicBlock loopBodyBlock = new BasicBlock(nextBBid++);
@@ -984,14 +1034,18 @@ namespace ScannerParser {
                 loopBodyBlock.parentBlocks = new List<BasicBlock>();
                 loopBodyBlock.nestingLevel = globalNestingLevel;
                 loopBodyBlock.parentBlocks.Add(curBasicBlock);
-                loopBodyBlock.childBlocks.Add(curBasicBlock);
                 curBasicBlock.childBlocks.Add(loopBodyBlock);
+                loopBodyBlocks.Push(loopBodyBlock);
                 curBasicBlock = loopBodyBlock;
 
                 StatSequence();
 
+                if (loopBodyBlock.childBlocks.Count == 0) {
+                    loopBodyBlock.childBlocks.Add(loopHeaderBlock);
+                }
+
                 globalNestingLevel--;
-                curBasicBlock = loopHeaderBlocks.Pop();
+                curBasicBlock = loopBodyBlocks.Pop();
                 BasicBlock loopFollowBlock = new BasicBlock(nextBBid++);
                 flowGraphNodes[loopFollowBlock.blockNum] = loopFollowBlock;
                 loopFollowBlock.childBlocks = new List<BasicBlock>();
@@ -1005,7 +1059,8 @@ namespace ScannerParser {
                 // todo, here we will need a branch to loop header
                 VerifyToken(Token.OD, "The while loop was not properly closed with the od keyword");
                 Next(); //eat od
-            } else {
+            }
+            else {
                 scanner.Error("The relation in the if did not contain a valid conditional operator");
             }
             //return new Result(); // todo, don't know what this should be either
@@ -1034,7 +1089,8 @@ namespace ScannerParser {
                 // scope may not actually change -- early return statement
                 return res;
 
-            } else {
+            }
+            else {
                 SSAWriter.ReturnFromProcedure(AssemblyPC);
                 AssemblyPC++;
                 return null;
@@ -1130,7 +1186,8 @@ namespace ScannerParser {
             if (s.identID < symbolTable.Count && symbolTable[s.identID] != null) {
                 // already have a symbol with this name
                 symbolTable[s.identID].AddScope(scope);
-            } else {
+            }
+            else {
                 symbolTable.Insert(scanner.id, s);
             }
         }
@@ -1224,27 +1281,42 @@ namespace ScannerParser {
             }
             return opString;
         }
-        private Token NegatedConditional(CondOp? cond) {
+
+        private Token NegatedConditional(Token cond) {
             // todo, do we even need CondOp? It seems redundant
             switch (cond) {
-                case CondOp.EQ:
+                case Token.EQL:
                     return Token.NEQ;
-                case CondOp.NEQ:
+                case Token.NEQ:
                     return Token.EQL;
-                case CondOp.LT:
+                case Token.LSS:
                     return Token.GEQ;
-                case CondOp.GT:
+                case Token.GTR:
                     return Token.LEQ;
-                case CondOp.LEQ:
+                case Token.LEQ:
                     return Token.GTR;
-                case CondOp.GEQ:
+                case Token.GEQ:
                     return Token.LSS;
                 default:
                     return Token.ERROR;
             }
         }
 
-
+        private string GetLabel(BasicBlock block, int blockNum)
+        {
+            switch (block.blockType)
+            {
+                case BasicBlock.BlockType.TRUE:
+                    return "TRUE_" + blockNum + ":";
+                case BasicBlock.BlockType.FALSE:
+                    return "FALSE_" + blockNum + ":";
+                case BasicBlock.BlockType.JOIN:
+                    return "JOIN_" + blockNum + ":";
+                default:
+                    Debug.WriteLine("Shouldn't get here");
+                    return "";
+            }
+        }
 
 
     }
