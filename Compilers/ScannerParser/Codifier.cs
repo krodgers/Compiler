@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -19,11 +20,69 @@ namespace ScannerParser {
 
         }
 
+        // Writes error message and exits
+        public void Error(string msg) {
+            Debug.WriteLine(msg);
+            Console.WriteLine(msg);
+            sw.WriteLine(msg);
+            sw.Dispose();
+            System.Environment.Exit(0);
+        }
+
+
+
 
         ////////////////////////////////////
         //  General Instructions	      //
         ////////////////////////////////////
+        private void WriteInstruction(Token opCode, Instruction currInstr) {
+            
+            switch (opCode) {
+// math instructions
+                case Token.TIMES:
+                case Token.DIV:
+                case Token.PLUS:
+                case Token.MINUS:
+                    HandleMathInstruction(opCode, currInstr);
+                    break;
+                    // Memory Instructions
+// Function Instruction
+                case Token.CALL:
+                case Token.END:
+                case Token.RETURN:
+                    HandleFunctionInstruction(opCode, currInstr);
+                    break;
+// Branching Instruction
+// Comparing Instruction
+                case Token.EQL:
+                case Token.NEQ:
+                case Token.LSS:
+                case Token.GEQ:
+                case Token.LEQ:
+                case Token.GTR:
+                    HandleCompareInstruction(opCode, currInstr);
+break;
+                default:
+Error(String.Format("Unable to classify opcode {0}", opCode));
+            }
 
+        }
+
+        private void HandleCompareInstruction(Token opCode, Instruction currInstr) {
+            throw new NotImplementedException();
+        }
+
+        private void HandleFunctionInstruction(Token opCode, Instruction currInstr) {
+            throw new NotImplementedException();
+        }
+
+        private void HandleMathInstruction(Token opCode, Instruction currInstr) {
+            throw new NotImplementedException();
+        }
+// puts opcode A B
+        private void PutArithmeticInstruction(string opCode, string whereToStore, string operandA, string operand) {
+
+        }
 
 
 
@@ -81,7 +140,42 @@ namespace ScannerParser {
         /////////////////////////////////
 
 
+        ///////////////////////////////////
+        // Utilities                     //
+        ///////////////////////////////////
+        private string TokenToInstruction(Token t) {
+            string opString;
+            switch (t) {
+                case Token.TIMES:
+                    opString = "mul";
+                    break;
+                case Token.DIV:
+                    opString = "div";
+                    break;
+                case Token.PLUS:
+                    opString = "add";
+                    break;
+                case Token.MINUS:
+                    opString = "sub";
+                    break;
+                case Token.BECOMES:
+                    opString = "mov";
+                    break;
+                case Token.EQL:
+                case Token.NEQ:
+                case Token.LSS:
+                case Token.GEQ:
+                case Token.LEQ:
+                case Token.GTR:
+                    opString = "cmp";
+                    break;
+                default:
+                    opString = "nop";
+                    break;
 
+            }
+            return opString;
+        }
 
 
 

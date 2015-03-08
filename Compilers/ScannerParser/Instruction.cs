@@ -13,7 +13,7 @@ namespace ScannerParser {
         public Instruction next;
         public Instruction prev;
         public BasicBlock myBasicBlock{private set; get;}
-        public string opCode;
+        public Token opCode;
         public string firstOperand;
         public OperandType? firstOperandType;
         public string secondOperand;
