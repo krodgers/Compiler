@@ -37,7 +37,7 @@ namespace ScannerParser {
                 Console.WriteLine("WARNING: failed to initialize result. Wrong Kind for Array constructor");
                 return;
             }
-
+            type = Kind.ARR;
             arrBase = arrName;
             arrIndices = indicesForArray;
 
@@ -166,6 +166,7 @@ namespace ScannerParser {
             valueD = d;
 
         }
+      
         // Utilities
       
         public static CondOp TokenToCondition(Token cond) {

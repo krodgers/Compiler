@@ -7,8 +7,6 @@ using System.Threading.Tasks;
 namespace ScannerParser {
     class ArraySymbol: Symbol {
         private int[] arrDims; // the dimensions of the array
-
-
         public ArraySymbol(Token whatAmI, int ID, int lineNum, int[] arrayDimensions, int scope)
             : base(whatAmI, ID, lineNum, scope)
         {

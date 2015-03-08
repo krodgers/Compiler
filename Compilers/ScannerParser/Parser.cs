@@ -44,7 +44,7 @@ namespace ScannerParser {
         private List<Symbol> symbolTable; // all the symbols! // indexed by symbol id
 
         private Stack<BasicBlock> joinBlocks;
-        private Stack<BasicBlock> loopHeaderBlocks; 
+        private Stack<BasicBlock> loopHeaderBlocks;
         private int globalNestingLevel;
         BasicBlock trueBlock, falseBlock, joinBlock;
         Dictionary<int, BasicBlock> flowGraphNodes;
@@ -66,7 +66,7 @@ namespace ScannerParser {
 
             joinBlocks = new Stack<BasicBlock>();
             loopHeaderBlocks = new Stack<BasicBlock>();
-            
+
             globalNestingLevel = 0;
             trueBlock = falseBlock = joinBlock = null;
             flowGraphNodes = new Dictionary<int, BasicBlock>();
@@ -81,7 +81,7 @@ namespace ScannerParser {
 
         ~Parser() {
             try {
-              
+
                 if (SSAWriter.sw != null)
                     SSAWriter.sw.Dispose(); // closes sw and fs
             } catch (Exception) {
@@ -202,7 +202,7 @@ namespace ScannerParser {
             scanner.Error(msg);
         }
 
-        
+
         private Result Expression() {
             Result res;
             Result res2;
@@ -271,11 +271,13 @@ namespace ScannerParser {
                     Next();
                 } else {
                     // todo, evaluate when this happens
-                    res = SSAWriter.LoadVariable(res, AssemblyPC);
-                    AssemblyPC++;
-                    //sw.WriteLine("{3}: Load {0}[{1}] R{2}", res.GetValue(), res.GetValue(), currRegister, AssemblyPC);
-                    //Console.WriteLine("{3}: Load {0}[{1}] R{2}", res.GetValue(), res.GetValue(), currRegister, AssemblyPC++);
-                    //res = new Result(Kind.REG, currRegister); // TODO:: Or a variable?
+                    if (res.type == Kind.VAR || res.type == Kind.REG) {
+                        res = SSAWriter.LoadVariable(res, AssemblyPC);
+                        AssemblyPC++;
+                    } else if (res.type == Kind.ARR) {
+                        res = SSAWriter.LoadArrayElement(res, GetArrayDimensions(res.GetValue()), res.GetArrayIndices(), AssemblyPC);
+                        AssemblyPC = res.lineNumber + 1;
+                    }
                 }
 
             }
@@ -285,7 +287,7 @@ namespace ScannerParser {
         // TODO:: Handle Arrays correctly --> getting address when needed
 
         private int[] GetArrayDimensions(string arrayName) {
-            ArraySymbol currSym = (ArraySymbol) symbolTable[scanner.String2Id(arrayName)];
+            ArraySymbol currSym = (ArraySymbol)symbolTable[scanner.String2Id(arrayName)];
             if (currSym == null || !currSym.IsInScope(scopes.Peek()) || !currSym.IsGlobal()) {
                 scanner.Error(String.Format("{1}: Array {0} not in scope", arrayName, AssemblyPC));
                 return null;
@@ -303,10 +305,10 @@ namespace ScannerParser {
                 Console.WriteLine("{0}: Designator got null res", AssemblyPC);
 
             if (scannerSym == Token.OPENBRACKET) {
-                Next(); // eat [
+              //  Next(); // eat [
                 res = MakeArrayReference(res);
-                VerifyToken(Token.CLOSEBRACKET, "Designator: Unmatched [.... missing ]");
-                Next();
+//                VerifyToken(Token.CLOSEBRACKET, "Designator: Unmatched [.... missing ]");
+              //  Next();
 
             }
 
@@ -322,7 +324,7 @@ namespace ScannerParser {
 
             return res;
         }
-      
+
         private Result FuncCall() {
             Result res = null;
             FunctionSymbol currentFunction;
@@ -353,7 +355,7 @@ namespace ScannerParser {
                                 int ID = scanner.String2Id(currArg.GetValue());
                                 if (ID != -1)
                                     UpdateSymbol(symbolTable[ID], currArg);
-                                AssemblyPC+=2;
+                                AssemblyPC += 2;
                             } else {
                                 Next();
                             }
@@ -365,13 +367,13 @@ namespace ScannerParser {
                                 scannerSym == Token.OPENPAREN || scannerSym == Token.CALL) {
                                     Result currArg = Expression();
                                     optionalArguments.Add(currArg);
-                                // TODO:: Need to store the function's offset somewhere, i.e which argument is it
+                                    // TODO:: Need to store the function's offset somewhere, i.e which argument is it
                                     SSAWriter.StoreFunctionArgument(currArg, AssemblyPC);
-                                // Set the value of the arguments
+                                    // Set the value of the arguments
                                     int ID = scanner.String2Id(currArg.GetValue());
                                     if (ID != -1)
                                         UpdateSymbol(symbolTable[ID], currArg);
-                                    AssemblyPC+=2;
+                                    AssemblyPC += 2;
                                 } else {
                                     scanner.Error("Ended up in optional arguments of function call and didn't parse a number, variable, comma, or expression");
                                 }
@@ -379,15 +381,15 @@ namespace ScannerParser {
 
                             VerifyToken(Token.CLOSEPAREN, "Ended up in arguments of function call and didn't parse a number, variable, comma, or expression");
                             Next();
+                            if (optionalArguments.Count != currentFunction.numberOfFormalParamters)
+                            Error(String.Format("{0}: Wrong number of parameters for {1}", AssemblyPC, scanner.Id2String(currentFunction.identID)));
 
                         }
 
-                        if (optionalArguments.Count != currentFunction.numberOfFormalParamters)
-                            Error(String.Format("{0}: Wrong number of parameters for {1}", AssemblyPC, scanner.Id2String(currentFunction.identID)));
-
-                            // branch to function
+                        
+                        // branch to function
                         SSAWriter.FunctionEntry(res, AssemblyPC++);
-                     
+
                         if (symbolTable[scanner.String2Id(res.GetValue())].type == Token.FUNC) {
                             res = new Result(Kind.REG, "EAX"); // going to call return register EAX
                         }
@@ -418,8 +420,8 @@ namespace ScannerParser {
                     else if (scannerSym == Token.NUMBER || scannerSym == Token.IDENT)
                         res = Expression();
                     //sw.WriteLine("WRD " + res.GetValue());
-                    SSAWriter.sw.WriteLine("{0}: write {1}", AssemblyPC,  res.GetValue());
-                    Console.WriteLine("{0}: write {1} " , AssemblyPC++,  res.GetValue());
+                    SSAWriter.sw.WriteLine("{0}: write {1}", AssemblyPC, res.GetValue());
+                    Console.WriteLine("{0}: write {1} ", AssemblyPC++, res.GetValue());
 
                     VerifyToken(Token.CLOSEPAREN, "OutputNum missing )");
                     Next(); // eat )
@@ -435,7 +437,7 @@ namespace ScannerParser {
                     Next(); // eat ) 
                     res = new Result(Kind.REG, String.Format("({0})", AssemblyPC));
                     SSAWriter.sw.WriteLine("{0}: read", AssemblyPC);
-                    Console.WriteLine("{0}: read  " , AssemblyPC++);
+                    Console.WriteLine("{0}: read  ", AssemblyPC++);
 
                     //sw.WriteLine("RDD {0}", res.regNo);
                     break;
@@ -450,14 +452,14 @@ namespace ScannerParser {
             return res;
         }
 
-// TODO:: NEed to print out branching instructions
-// TODO:: My idea is to add all of the instructions to the basic block as we go along
-// When we get to a place where we can know what branching address will be, we write out the
-// entire block using SSAWriter.WriteControlFlowBlock(curBlock, fixUpAddr)
-// Find out fix up addr by subtractin the current Assembly PC from the first line number in the block
+        // TODO:: NEed to print out branching instructions
+        // TODO:: My idea is to add all of the instructions to the basic block as we go along
+        // When we get to a place where we can know what branching address will be, we write out the
+        // entire block using SSAWriter.WriteControlFlowBlock(curBlock, fixUpAddr)
+        // Find out fix up addr by subtractin the current Assembly PC from the first line number in the block
 
         private Result IfStatement() {
-            
+
             Result res = null;
             if (scannerSym == Token.IF) {
                 Next();
@@ -524,8 +526,7 @@ namespace ScannerParser {
                                     trueBlock.childBlocks.Add(joinBlock);
                                     joinBlock.parentBlocks.Add(trueBlock);
                                 }
-                            }
-                            else {
+                            } else {
                                 if (curBasicBlock.childBlocks.Count < 2) {
                                     curBasicBlock.childBlocks.Add(joinBlock);
                                     joinBlock.parentBlocks.Add(curBasicBlock);
@@ -567,7 +568,7 @@ namespace ScannerParser {
             VerifyToken(Token.IDENT, "Ended up at Identifier but didn't parse an identifier");
             // make sure thing is in scope
             if (!CheckScope(scanner.id)) return null;
-         
+
             res = new Result(Kind.VAR, scanner.Id2String(scanner.id)); // changed to var for now to simulate output
             Next(); // eat the identifier
             return res;
@@ -606,13 +607,24 @@ namespace ScannerParser {
                 // Needs to output a move instruction which for now will be done here,
                 // but maybe should be moved elsewhere
                 res2 = LoadIfNeeded(res2);
-                SSAWriter.PutInstruction("mov", res2.GetValue(), res1.GetValue(), AssemblyPC);
-                // If the thing is potentially a variable
-                int ID = scanner.String2Id(res1.GetValue());
-                if (ID != -1) {
-                    UpdateSymbol(symbolTable[ID], null); // log the line number, current result, etc
+                if (res1.type == Kind.ARR) {
+                    // Need to store arrays differently
+                    // TODO:: for now, storing things in memory immediately, but should only store when absolutely necessary
+                 //   res1 = LoadIfNeeded(res1);
+                    AssemblyPC = SSAWriter.StoreArrayElement(res1, res2, GetArrayDimensions(res1.GetValue()), res1.GetArrayIndices(), AssemblyPC);
+                    // TODO:: don't update symbol cause it kills everything anyways?
+                } else {
+                    SSAWriter.PutInstruction("mov", res2.GetValue(), res1.GetValue(), AssemblyPC);
+                    AssemblyPC++;
+                
                 }
-                AssemblyPC++;
+                    // If the thing is potentially a variable
+                    int ID = scanner.String2Id(res1.GetValue());
+                    if (ID != -1) {
+                        UpdateSymbol(symbolTable[ID], null); // log the line number, current result, etc
+                    }
+                
+               
             } else {
                 scanner.Error("Ended up at Assignment but didn't encounter let keyword");
             }
@@ -626,7 +638,7 @@ namespace ScannerParser {
             // Check if the variable needs to be loaded from somewhere
             newA = LoadIfNeeded(A);
             newB = LoadIfNeeded(B);
-           
+
 
             if (newA.type == Kind.VAR && newB.type == Kind.VAR) {
                 switch (GetOpCodeClass(opCode)) {
@@ -715,7 +727,7 @@ namespace ScannerParser {
                 // This case causes issues with register allocation as it
                 // is possibly not needed for constants
               else if (newA.type == Kind.CONST && newB.type == Kind.CONST) {
-                  res = new Result(Kind.CONST, "");
+                res = new Result(Kind.CONST, "");
                 switch (opCode) {
                     case Token.TIMES:
                         res.SetValue(Double.Parse(newA.GetValue()) * Double.Parse(newB.GetValue()));
@@ -747,7 +759,7 @@ namespace ScannerParser {
                 Symbol curSymbol = symbolTable[variID];
 
                 if (curSymbol.GetType() == typeof(FunctionArgumentSymbol) && curSymbol.IsInScope(scopes.Peek())) {
-                    FunctionArgumentSymbol argSym =  (FunctionArgumentSymbol) curSymbol;
+                    FunctionArgumentSymbol argSym = (FunctionArgumentSymbol)curSymbol;
                     int offset = argSym.GetFunctionArgumentOffset();
                     res = SSAWriter.LoadFunctionArgument(offset, variableToLoad, AssemblyPC);
                     UpdateSymbol(curSymbol, res);
@@ -760,10 +772,17 @@ namespace ScannerParser {
                     UpdateSymbol(curSymbol, res);
                     AssemblyPC += 1;
 
-                } else if (curSymbol.GetCurrentValue(scopes.Peek()) != null){
+                } else if (curSymbol.GetCurrentValue(scopes.Peek()) != null) {
                     // Check if the variable has a value already in the scope
                     res = curSymbol.GetCurrentValue(scopes.Peek());
                 }
+            } else if (variableToLoad.type == Kind.ARR) {
+                if (scannerSym == Token.OPENBRACKET)
+                    res = MakeArrayReference(res);
+                res = SSAWriter.LoadArrayElement(res, GetArrayDimensions(res.GetValue()), res.GetArrayIndices(), AssemblyPC);
+                AssemblyPC = res.lineNumber + 1;
+                
+
             }
 
             return res;
@@ -830,7 +849,7 @@ namespace ScannerParser {
             }
 
             VerifyToken(Token.IDENT, "Function/Procedure declaration missing a name");
-            
+
             FunctionSymbol function;
             if (scopes.Peek() == 1) { // function is in global scope as well as local scope
                 function = new FunctionSymbol(funcType, scanner.id, AssemblyPC, scopes.Peek());
@@ -958,7 +977,7 @@ namespace ScannerParser {
                 curBasicBlock = loopHeaderBlock;
                 loopHeaderBlocks.Push(curBasicBlock);
                 globalNestingLevel++;
-                
+
                 BasicBlock loopBodyBlock = new BasicBlock(nextBBid++);
                 flowGraphNodes[loopBodyBlock.blockNum] = loopBodyBlock;
                 loopBodyBlock.childBlocks = new List<BasicBlock>();
@@ -968,7 +987,7 @@ namespace ScannerParser {
                 loopBodyBlock.childBlocks.Add(curBasicBlock);
                 curBasicBlock.childBlocks.Add(loopBodyBlock);
                 curBasicBlock = loopBodyBlock;
-                
+
                 StatSequence();
 
                 globalNestingLevel--;
@@ -981,7 +1000,7 @@ namespace ScannerParser {
                 loopFollowBlock.parentBlocks.Add(curBasicBlock);
                 curBasicBlock.childBlocks.Add(loopFollowBlock);
                 curBasicBlock = loopFollowBlock;
-                
+
 
                 // todo, here we will need a branch to loop header
                 VerifyToken(Token.OD, "The while loop was not properly closed with the od keyword");
@@ -994,7 +1013,7 @@ namespace ScannerParser {
         }
 
 
-// TODO:: Need to move the return value OUT of EAX
+        // TODO:: Need to move the return value OUT of EAX
         private Result ReturnStatement() {
             VerifyToken(Token.RETURN, "Missing return keyword");
             Next();
@@ -1012,7 +1031,7 @@ namespace ScannerParser {
                 res = LoadIfNeeded(res);
                 SSAWriter.ReturnFromFunction(res, AssemblyPC);
                 AssemblyPC++;
-               // scope may not actually change -- early return statement
+                // scope may not actually change -- early return statement
                 return res;
 
             } else {
@@ -1117,7 +1136,7 @@ namespace ScannerParser {
         }
 
         // Call when we want to keep compiling after an error
-// Scans until we hit the next line of the file
+        // Scans until we hit the next line of the file
         private void AbortLine() {
             int currPC = scanner.PC;
             while (scanner.PC == currPC) {
@@ -1145,6 +1164,7 @@ namespace ScannerParser {
 
 
             return new Result(Kind.ARR, res.GetValue(), indexer);
+
 
         }
         private OpCodeClass GetOpCodeClass(Token opCode, bool immediate = false) {
@@ -1204,7 +1224,7 @@ namespace ScannerParser {
             }
             return opString;
         }
-           private Token NegatedConditional(CondOp? cond) {
+        private Token NegatedConditional(CondOp? cond) {
             // todo, do we even need CondOp? It seems redundant
             switch (cond) {
                 case CondOp.EQ:
