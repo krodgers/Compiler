@@ -848,9 +848,9 @@ namespace ScannerParser {
             } else if (variableToLoad.type == Kind.ARR) {
                 if (scannerSym == Token.OPENBRACKET)
                     res = MakeArrayReference(res);
-                res = SSAWriter.LoadArrayElement(res, GetArrayDimensions(res.GetValue()), res.GetArrayIndices(), AssemblyPC);
-
+                
                 instructionManager.PutLoadArray(res, GetArrayDimensions(res.GetValue()), res.GetArrayIndices(), AssemblyPC);
+                res = SSAWriter.LoadArrayElement(res, GetArrayDimensions(res.GetValue()), res.GetArrayIndices(), AssemblyPC);
                 AssemblyPC = res.lineNumber + 1;
             }
 
