@@ -102,7 +102,7 @@ namespace ScannerParser {
             //HandleToken(); TODO this needs to be moved somewhere else because causes problems in next
         }
 
-        public void StartFirstPass() {
+        public BasicBlock StartFirstPass() {
 
             entryBlock = new BasicBlock(nextBBid++);
             entryBlock.blockLabel = "ENTRY:";
@@ -125,6 +125,8 @@ namespace ScannerParser {
             instructionManager.setCurrentBlock(curBasicBlock);
 
             Main();
+
+            return entryBlock;
         }
 
 
@@ -353,6 +355,7 @@ namespace ScannerParser {
                     VerifyToken(Token.CLOSEPAREN, "Called OutputNewLine, missing )");
                     Next(); // eat )
                     //sw.WriteLine("WRL");
+                    instructionManager.PutBasicInstruction(Token.OUTPUTNEWLINE, new Result(Kind.CONST, "DummyVarA"), new Result(Kind.CONST, "DummyVarB"), AssemblyPC);
                     SSAWriter.sw.WriteLine("{0}: wln", AssemblyPC);
                     Console.WriteLine("{0}: wln", AssemblyPC++);
 
@@ -368,6 +371,9 @@ namespace ScannerParser {
                     else if (scannerSym == Token.NUMBER || scannerSym == Token.IDENT)
                         res = Expression();
                     //sw.WriteLine("WRD " + res.GetValue());
+                    res = LoadIfNeeded(res);
+
+                    instructionManager.PutBasicInstruction(Token.OUTPUTNUM, res, new Result(Kind.CONST, "DummyVarB"), AssemblyPC);
                     SSAWriter.sw.WriteLine("{0}: write {1}", AssemblyPC, res.GetValue());
                     Console.WriteLine("{0}: write {1} ", AssemblyPC++, res.GetValue());
 
@@ -386,7 +392,7 @@ namespace ScannerParser {
                     res = new Result(Kind.REG, String.Format("({0})", AssemblyPC));
                     SSAWriter.sw.WriteLine("{0}: read", AssemblyPC);
                     Console.WriteLine("{0}: read  ", AssemblyPC++);
-
+                    instructionManager.PutBasicInstruction(Token.INPUTNUM, res, new Result(Kind.CONST, "DummyVarB"), AssemblyPC);
                     //sw.WriteLine("RDD {0}", res.regNo);
                     break;
 
@@ -531,7 +537,9 @@ namespace ScannerParser {
             // make sure thing is in scope
             if (!CheckScope(scanner.id)) return null;
 
+            // load latest value
             res = new Result(Kind.VAR, scanner.Id2String(scanner.id)); // changed to var for now to simulate output
+
             Next(); // eat the identifier
             return res;
 
@@ -573,19 +581,27 @@ namespace ScannerParser {
                     // Need to store arrays differently
                     // TODO:: for now, storing things in memory immediately, but should only store when absolutely necessary
                  //   res1 = LoadIfNeeded(res1);
-                    AssemblyPC = SSAWriter.StoreArrayElement(res1, res2, GetArrayDimensions(res1.GetValue()), res1.GetArrayIndices(), AssemblyPC);
-                    // TODO:: don't update symbol cause it kills everything anyways?
-                } else {
-                	instructionManager.PutBasicInstruction(Token.BECOMES, res2, res1, AssemblyPC);
-                    SSAWriter.PutInstruction("mov", res2.GetValue(), res1.GetValue(), AssemblyPC);
-                    AssemblyPC++;
-                
-                }
-                    // If the thing is potentially a variable
+                     // If the thing is potentially a variable
                     int ID = scanner.String2Id(res1.GetValue());
                     if (ID != -1) {
                         UpdateSymbol(symbolTable[ID], null); // log the line number, current result, etc
                     }
+                    instructionManager.PutStoreArray(res1, res2, GetArrayDimensions(res1.GetValue()), res1.GetArrayIndices(), AssemblyPC);
+                    AssemblyPC = SSAWriter.StoreArrayElement(res1, res2, GetArrayDimensions(res1.GetValue()), res1.GetArrayIndices(), AssemblyPC);
+
+                    // TODO:: don't update symbol cause it kills everything anyways?
+                } else {
+                	instructionManager.PutBasicInstruction(Token.BECOMES, res2, res1, AssemblyPC);
+                    SSAWriter.PutInstruction("mov", res2.GetValue(), res1.GetValue(), AssemblyPC);
+                    // If the thing is potentially a variable
+                    int ID = scanner.String2Id(res1.GetValue());
+                    if (ID != -1) {
+                        UpdateSymbol(symbolTable[ID], null); // log the line number, current result, etc
+                    }                    
+                    AssemblyPC++;
+                
+                }
+                   
                 
                
             } else {
@@ -833,9 +849,9 @@ namespace ScannerParser {
                 if (scannerSym == Token.OPENBRACKET)
                     res = MakeArrayReference(res);
                 res = SSAWriter.LoadArrayElement(res, GetArrayDimensions(res.GetValue()), res.GetArrayIndices(), AssemblyPC);
-                AssemblyPC = res.lineNumber + 1;
-                
 
+                instructionManager.PutLoadArray(res, GetArrayDimensions(res.GetValue()), res.GetArrayIndices(), AssemblyPC);
+                AssemblyPC = res.lineNumber + 1;
             }
 
             return res;
@@ -882,6 +898,7 @@ namespace ScannerParser {
                 if (VerifyToken(Token.END, "Missing closing bracket of program")) {
                     Next();
                     if (VerifyToken(Token.PERIOD, "Unexpected end of program - missing period")) {
+                        instructionManager.PutBasicInstruction(Token.END, new Result(Kind.CONST, "DUmMYA"), new Result(Kind.CONST, "DUMMYB"), AssemblyPC);
                         SSAWriter.sw.WriteLine("{0}: end", AssemblyPC++);
                         Console.WriteLine("{0}: end", AssemblyPC++);
 

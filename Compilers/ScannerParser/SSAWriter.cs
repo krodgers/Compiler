@@ -132,66 +132,27 @@ namespace ScannerParser {
         // Returns the final line number ( so that you know what to set AssemblyPC to afterwards)
         // Loads an array reference i.e. a[i][j]
         public static Result LoadArrayElement(Result array, int[] dims, Result[] indices, int lineNumber) {
-            Result[] inds = array.arrIndices;
-            int addr = 0;
-            int constantAccum = 1;
-            Result currentResult = null;
-            List<Result> termsToAdd = new List<Result>();
-
-            for (int i = 0; i < indices.Length - 1; i++) {
-                for (int d = i + 1; d < dims.Length; d++) {
-                    constantAccum *= dims[d];
-                }
-                if (indices[i].type == Kind.CONST) {
-                    // Continue accumulating a constant address
-                    addr += constantAccum * Int32.Parse(indices[i].GetValue());
-                } else {
-                    currentResult = new Result(Kind.REG, String.Format("({0})", lineNumber));
-                    Console.WriteLine("{0}: mul #{1} {2}", lineNumber, constantAccum, indices[i].GetValue());
-                    sw.WriteLine("{0}: mul #{1} {2}", lineNumber++, constantAccum, indices[i].GetValue());
-                    termsToAdd.Add(currentResult);
-                }
-                constantAccum = 1;
-            }
-            // all other terms have been pushed to termsToAdd
-            currentResult = indices[indices.Length - 1];
-
-            // check for constant address parts
-            if (addr != 0) {
-                // add address part and last index
-                currentResult = PutArithmeticRegInstruction("add", currentResult, new Result(Kind.CONST, addr), lineNumber++);
-            }
-
-            // If there are no constant address parts, then currentResult sure to be initialized
-            Debug.Assert(currentResult != null, "LoadArray has null result");
-
-
-            foreach (Result r in termsToAdd) {
-                // Add all of the terms
-                currentResult = PutArithmeticRegInstruction("add", currentResult, r, lineNumber++);
-            }
-
-            // Multiply address by 4
-            currentResult = PutArithmeticRegInstruction("mul", new Result(Kind.CONST, 4), currentResult, lineNumber++);
-            // add FP + Base
-            Result arrayBase = PutArithmeticRegInstruction("add", new Result(Kind.REG, "FP"), array, lineNumber++);
-            // adda/store
-            Console.WriteLine("{0}: adda {1} {2}", lineNumber, currentResult.GetValue(), arrayBase.GetValue());
-            sw.WriteLine("{0}: adda {1} {2}", lineNumber++, currentResult.GetValue(), arrayBase.GetValue());
-
-            Console.WriteLine("{0}: load ({1})", lineNumber, (lineNumber - 1));
-            sw.WriteLine("{0}: load ({1})", lineNumber, (lineNumber - 1));
-
-            Result finalResult = new Result(Kind.REG, String.Format("({0})", lineNumber));
-            finalResult.lineNumber = lineNumber;
-            lineNumber += 1;
+            int finalLineNumber;
+            Result finalResult;
+            FigureArrayAddress(array, null, dims, indices, lineNumber, true, out finalLineNumber, out finalResult);
 
             return finalResult;
 
         }
-        // Returns the final line number ( so that you know what to set AssemblyPC to afterwards)
+
+                // Returns the final line number ( so that you know what to set AssemblyPC to afterwards)
         // Loads an array reference i.e. a[i][j]
         public static int StoreArrayElement(Result array, Result thingToStore, int[] dims, Result[] indices, int lineNumber) {
+            int finalLineNumber;
+            Result finalResult;
+
+            FigureArrayAddress(array, thingToStore, dims, indices, lineNumber, false, out finalLineNumber, out finalResult);
+
+            return finalLineNumber;
+
+        }
+
+        private static void FigureArrayAddress(Result array, Result thingToStore, int[] dims, Result[] indices, int lineNumber, bool doLoad, out int finalLineNumber, out Result finalResult) {
             Result[] inds = array.arrIndices;
             int addr = 0;
             int constantAccum = 1;
@@ -218,39 +179,50 @@ namespace ScannerParser {
 
             // check for constant address parts
             if (addr != 0) {
-                // add address part and last index
-                currentResult = PutArithmeticRegInstruction("add", currentResult, new Result(Kind.CONST, addr), lineNumber++);
+                if (currentResult.type == Kind.CONST)
+                    currentResult = new Result(Kind.CONST, addr + Int32.Parse(currentResult.GetValue()));
+                else
+                    // add address part and last index
+                    currentResult = PutArithmeticRegInstruction("add", currentResult, new Result(Kind.CONST, addr), lineNumber++);
             }
 
             // If there are no constant address parts, then currentResult sure to be initialized
-            Debug.Assert(currentResult != null, "StoreArray has null result");
-
-
+            Debug.Assert(currentResult != null, "LoadArray has null result");
             foreach (Result r in termsToAdd) {
                 // Add all of the terms
                 currentResult = PutArithmeticRegInstruction("add", currentResult, r, lineNumber++);
             }
 
             // Multiply address by 4
-            currentResult = PutArithmeticRegInstruction("mul", new Result(Kind.CONST, 4), currentResult, lineNumber++);
+            if (currentResult.type == Kind.CONST)
+                currentResult = new Result(Kind.CONST, Int32.Parse(currentResult.GetValue()) * 4);
+            else
+                currentResult = PutArithmeticRegInstruction("mul", new Result(Kind.CONST, 4), currentResult, lineNumber++);
             // add FP + Base
             Result arrayBase = PutArithmeticRegInstruction("add", new Result(Kind.REG, "FP"), array, lineNumber++);
             // adda/store
             Console.WriteLine("{0}: adda {1} {2}", lineNumber, currentResult.GetValue(), arrayBase.GetValue());
             sw.WriteLine("{0}: adda {1} {2}", lineNumber++, currentResult.GetValue(), arrayBase.GetValue());
 
-            Store(thingToStore, new Result(Kind.REG, String.Format("({0})", lineNumber - 1)), lineNumber);
+            if (doLoad) {
+                Console.WriteLine("{0}: load ({1})", lineNumber, (lineNumber - 1));
+                sw.WriteLine("{0}: load ({1})", lineNumber, (lineNumber - 1));
+            } else {
+                Store(thingToStore, new Result(Kind.REG, String.Format("({0})", lineNumber - 1)), lineNumber);
 
-            //Console.WriteLine("{0}: store ({1})", lineNumber, (lineNumber - 1));
-            //sw.WriteLine("{0}: store ({1})", lineNumber, (lineNumber - 1));
+            }
 
-            Result finalResult = new Result(Kind.REG, String.Format("({0})", lineNumber));
+            finalResult = new Result(Kind.REG, String.Format("({0})", lineNumber));
             finalResult.lineNumber = lineNumber;
             lineNumber += 1;
+            finalLineNumber = lineNumber;
 
-            return lineNumber;
 
         }
+
+
+
+
 
 
         //////////////////////////////////////////////

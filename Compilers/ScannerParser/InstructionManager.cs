@@ -24,8 +24,9 @@ namespace ScannerParser {
             return curBasicBlock;
         }
 
-        public void PutBasicInstruction(Token opCode, Result a, Result b, int lineNumber) {
 
+        // NOTE:  Token.ARR means adda
+        public void PutBasicInstruction(Token opCode, Result a, Result b, int lineNumber) {
 
             // Initialize all of the non-pointer fields for the instruction
             Instruction tmp = new Instruction(lineNumber, curBasicBlock);
@@ -113,11 +114,13 @@ namespace ScannerParser {
             Instruction tmp = new Instruction(lineNumber, curBasicBlock);
             tmp.opCode = Token.MINUS;
 
-            tmp.firstOperand = "#4";
+            tmp.firstOperand = "4";
             tmp.firstOperandType = Instruction.OperandType.CONSTANT;
 
             tmp.secondOperand = "$SP";
             tmp.secondOperandType = Instruction.OperandType.REG;
+
+
 
             // Add the new instruction to the dictionary of all instructions
             instructionDictionary.Add(lineNumber, tmp);
@@ -179,6 +182,94 @@ namespace ScannerParser {
 
             // Initialize all of the pointer fields for the instruction
             InsertAndLink(tmp);
+        }
+
+        public void PutLoadArray(Result array, int[] dims, Result[] indices, int lineNum) {
+            Result currentResult;
+            int lineNumber = PutArrayAddress(array, dims, indices, lineNum, out currentResult);
+            
+            // add FP + Base
+            Result arrayBase = new Result(Kind.REG, String.Format("({0})", lineNumber));
+            PutBasicInstruction(Token.PLUS, new Result(Kind.REG, "FP"), array, lineNumber++);
+            // adda/load
+            PutBasicInstruction(Token.ARR, currentResult, arrayBase, lineNumber);
+            lineNumber++;
+            Result finalResult = new Result(Kind.REG, String.Format("({0})", lineNumber));
+            finalResult.lineNumber = lineNumber;
+            PutLoadInstruction(finalResult, lineNumber);
+        }
+
+        public void PutStoreArray(Result array, Result thingToStore, int[] dims, Result[] indices, int lineNum) {
+            Result currentResult;
+            int lineNumber = PutArrayAddress(array, dims, indices, lineNum, out currentResult);
+
+            // add FP + Base
+            Result arrayBase = new Result(Kind.REG, String.Format("({0})", lineNumber));
+            PutBasicInstruction(Token.PLUS, new Result(Kind.REG, "FP"), array, lineNumber++);
+            // adda/load
+            PutBasicInstruction(Token.ARR, currentResult, arrayBase, lineNumber);
+            lineNumber++;
+            Result finalResult = new Result(Kind.REG, String.Format("({0})", lineNumber));
+            finalResult.lineNumber = lineNumber;
+
+            PutBasicInstruction(Token.STORE, thingToStore, finalResult,  lineNumber);
+        }
+
+
+        // Returns the last lineNumber
+        private int PutArrayAddress(Result array, int[] dims, Result[] indices, int lineNumber, out Result currentResult) {
+            Result[] inds = array.arrIndices;
+            int addr = 0;
+            int constantAccum = 1;
+            currentResult = null;
+            List<Result> termsToAdd = new List<Result>();
+
+            for (int i = 0; i < indices.Length - 1; i++) {
+                for (int d = i + 1; d < dims.Length; d++) {
+                    constantAccum *= dims[d];
+                }
+                if (indices[i].type == Kind.CONST) {
+                    // Continue accumulating a constant address
+                    addr += constantAccum * Int32.Parse(indices[i].GetValue());
+                } else {
+                    currentResult = new Result(Kind.REG, String.Format("({0})", lineNumber));
+                    PutBasicInstruction(Token.TIMES, new Result(Kind.CONST, constantAccum), indices[i], lineNumber);
+                    termsToAdd.Add(currentResult);
+                }
+                constantAccum = 1;
+            }
+            // all other terms have been pushed to termsToAdd
+            currentResult = indices[indices.Length - 1];
+            // check for constant address parts
+            if (addr != 0) {
+                if (currentResult.type == Kind.CONST)
+                    currentResult = new Result(Kind.CONST, addr + Int32.Parse(currentResult.GetValue()));
+                else {
+                    // add address part and last index
+                    PutBasicInstruction(Token.PLUS, currentResult, new Result(Kind.CONST, addr), lineNumber);
+                    currentResult = new Result(Kind.REG, String.Format("({0})", lineNumber));
+                    lineNumber++;
+                }
+            }
+            // If there are no constant address parts, then currentResult sure to be initialized
+            Debug.Assert(currentResult != null, "LoadArray has null result");
+            foreach (Result r in termsToAdd) {
+                // Add all of the terms
+                PutBasicInstruction(Token.PLUS, currentResult, r, lineNumber);
+                currentResult = new Result(Kind.REG, String.Format("({0})", lineNumber));
+                lineNumber++;
+            }
+            // Multiply address by 4
+            if (currentResult.type == Kind.CONST)
+                currentResult = new Result(Kind.CONST, Int32.Parse(currentResult.GetValue()) * 4);
+            else {
+
+                PutBasicInstruction(Token.TIMES, new Result(Kind.CONST, 4), currentResult, lineNumber++);
+                currentResult = new Result(Kind.REG, String.Format("({0})", lineNumber));
+
+            }
+
+            return lineNumber;
         }
 
         private int GetNumFromSSAReg(string p) {
