@@ -6,19 +6,24 @@ using System.Threading.Tasks;
 
 namespace ScannerParser {
     public class BasicBlock {
-        public enum BlockType {ENTRY, STANDARD, TRUE, FALSE, JOIN, LOOP_HEADER, EXIT}
+        public enum BlockType {ENTRY, STANDARD, TRUE, FALSE, JOIN, LOOP_HEADER, FOLLOW, LOOP_BODY, EXIT}
         public int blockNum { set; get; } // which block this is
         public string blockLabel;
         public Instruction firstInstruction;// 
+        public int instructionCount;
+        public int joinPredecessorInstructionCount;
         public BasicBlock dominatingBlock; // 
         public List<BasicBlock> parentBlocks;
         public List<BasicBlock> childBlocks;  // block(s) with the instructions that follow this block's
         public int nestingLevel;
+        public int scopeNumber;
         public BlockType blockType;
 
 
         public BasicBlock(int myNumber) {
             blockNum = myNumber;
+            joinPredecessorInstructionCount = 0;
+            instructionCount = 0;
         }
 
 
