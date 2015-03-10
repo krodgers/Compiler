@@ -160,7 +160,24 @@ namespace ScannerParser {
             InsertAndLink(tmp);
         }
 
-        public void PutConditionalBranch(Token opCode, Result condResult, string label, int lineNumber)
+        // a branch instruction
+        public void PutUnconditionalBranch(Token opCode, int branchLocation, int lineNumber)
+        {
+            Instruction tmp = new Instruction(lineNumber, curBasicBlock);
+            tmp.opCode = opCode;
+
+            tmp.firstOperand = branchLocation.ToString();
+            tmp.firstOperandType = Instruction.OperandType.BRANCH;
+
+            // Add the new instruction to the dictionary of all instructions
+            instructionDictionary.Add(lineNumber, tmp);
+
+            // Initialize all of the pointer fields for the instruction
+            InsertAndLink(tmp);
+        }
+
+        // a compare instruction
+        public void PutConditionalBranch(Token opCode, Result condResult, string tempLabel, int lineNumber)
         {
             Instruction tmp = new Instruction(lineNumber, curBasicBlock);
             tmp.opCode = opCode;
@@ -174,8 +191,8 @@ namespace ScannerParser {
                 tmp.firstOperandType = KindToOperandType(condResult);
             }
 
-            tmp.secondOperand = label;
-            tmp.secondOperandType = Instruction.OperandType.LABEL;
+            tmp.secondOperand = tempLabel;
+            tmp.secondOperandType = Instruction.OperandType.BRANCH;
 
             // Add the new instruction to the dictionary of all instructions
             instructionDictionary.Add(lineNumber, tmp);
@@ -295,6 +312,7 @@ namespace ScannerParser {
         private void InsertAndLink(Instruction curInstruction) {
             if (curBasicBlock.firstInstruction == null) {
                 curBasicBlock.firstInstruction = curInstruction;
+                curBasicBlock.instructionCount = 1;
             }
             else {
                 Instruction tmp = curBasicBlock.firstInstruction;
@@ -302,6 +320,7 @@ namespace ScannerParser {
                     tmp = tmp.next;
                 tmp.next = curInstruction;
                 curInstruction.prev = tmp;
+                curBasicBlock.instructionCount++;
             }
 
             if (curInstruction.firstOperandType == Instruction.OperandType.SSA_VAL)
