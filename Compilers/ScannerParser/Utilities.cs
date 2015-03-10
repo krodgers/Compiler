@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace ScannerParser {
 
     // Class for random yet useful functions
-    class Utilities {
+   public  class Utilities {
 
 
 // Checks the output in filename against the expected string tokens in expected
@@ -46,6 +46,14 @@ namespace ScannerParser {
             sr.Dispose();
             Console.WriteLine("Passed");
             return true;
+        }
+
+        // opens SSAWriter file stream -- useful for testing stuffs
+        public static FileStream OpenStreams(string filename) {
+            FileStream fs = File.Open(filename, FileMode.Create, FileAccess.ReadWrite);
+            System.Diagnostics.Debug.Assert(fs != null);
+            SSAWriter.sw = new StreamWriter(fs);
+            return fs;
         }
 
     }

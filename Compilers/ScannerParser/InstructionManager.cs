@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace ScannerParser {
-    class InstructionManager {
+    public class InstructionManager {
         private Dictionary<int, Instruction> instructionDictionary;
         private BasicBlock curBasicBlock;
 
