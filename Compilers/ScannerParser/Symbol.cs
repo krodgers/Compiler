@@ -41,7 +41,7 @@ namespace ScannerParser {
         // Returns the last stored value of this symbol in the given scope
         // returns null if the scope isn't valid or symbol hasn't been given a value
         public Result GetCurrentValue(int whichScope) {
-            if (IsInScope(whichScope) && validScopes.ContainsKey(whichScope)) {
+            if ((IsGlobal() || IsInScope(whichScope)) && validScopes.ContainsKey(whichScope)) {
                 return validScopes[whichScope];
                 
             } else {
@@ -53,7 +53,8 @@ namespace ScannerParser {
         // Utilities
         // Add a valid scope to this symbol
         public void AddScope(int scope) {
-            validScopes.Add(scope, null);
+            if (!validScopes.ContainsKey(scope))
+                validScopes.Add(scope, null);
         }
 
         // assign a value to the symbol in given scope

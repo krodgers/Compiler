@@ -21,7 +21,7 @@ namespace ScannerParser {
         VAR = 110, ARR, FUNC, PROC,
         BEGIN = 150, MAIN = 200, EOF = 255,
         OUTPUTNUM, INPUTNUM, OUTPUTNEWLINE,
-        STORE, LOAD, BRANCH
+        STORE, LOAD, BRANCH, CHECK
     };
 
     public enum OpCodeClass {
@@ -251,7 +251,7 @@ namespace ScannerParser {
 
             if (scannerSym == Token.OPENBRACKET) {
               //  Next(); // eat [
-                res = MakeArrayReference(res);
+                res = MakeArrayReference(res, false);
 //                VerifyToken(Token.CLOSEBRACKET, "Designator: Unmatched [.... missing ]");
               //  Next();
 
@@ -355,7 +355,7 @@ namespace ScannerParser {
                     VerifyToken(Token.CLOSEPAREN, "Called OutputNewLine, missing )");
                     Next(); // eat )
                     //sw.WriteLine("WRL");
-                    instructionManager.PutBasicInstruction(Token.OUTPUTNEWLINE, new Result(Kind.CONST, "DummyVarA"), new Result(Kind.CONST, "DummyVarB"), AssemblyPC);
+                    instructionManager.PutBasicInstruction(Token.OUTPUTNEWLINE, new Result(Kind.CONST, ""), new Result(Kind.CONST, ""), AssemblyPC);
                     SSAWriter.sw.WriteLine("{0}: wln", AssemblyPC);
                     Console.WriteLine("{0}: wln", AssemblyPC++);
 
@@ -373,7 +373,7 @@ namespace ScannerParser {
                     //sw.WriteLine("WRD " + res.GetValue());
                     res = LoadIfNeeded(res);
 
-                    instructionManager.PutBasicInstruction(Token.OUTPUTNUM, res, new Result(Kind.CONST, "DummyVarB"), AssemblyPC);
+                    instructionManager.PutBasicInstruction(Token.OUTPUTNUM, res, new Result(Kind.CONST, ""), AssemblyPC);
                     SSAWriter.sw.WriteLine("{0}: write {1}", AssemblyPC, res.GetValue());
                     Console.WriteLine("{0}: write {1} ", AssemblyPC++, res.GetValue());
 
@@ -392,7 +392,7 @@ namespace ScannerParser {
                     res = new Result(Kind.REG, String.Format("({0})", AssemblyPC));
                     SSAWriter.sw.WriteLine("{0}: read", AssemblyPC);
                     Console.WriteLine("{0}: read  ", AssemblyPC++);
-                    instructionManager.PutBasicInstruction(Token.INPUTNUM, res, new Result(Kind.CONST, "DummyVarB"), AssemblyPC);
+                    instructionManager.PutBasicInstruction(Token.INPUTNUM, res, new Result(Kind.CONST, ""), AssemblyPC);
                     //sw.WriteLine("RDD {0}", res.regNo);
                     break;
 
@@ -847,7 +847,7 @@ namespace ScannerParser {
                 }
             } else if (variableToLoad.type == Kind.ARR) {
                 if (scannerSym == Token.OPENBRACKET)
-                    res = MakeArrayReference(res);
+                    res = MakeArrayReference(res, true);
                 
                 instructionManager.PutLoadArray(res, GetArrayDimensions(res.GetValue()), res.GetArrayIndices(), AssemblyPC);
                 res = SSAWriter.LoadArrayElement(res, GetArrayDimensions(res.GetValue()), res.GetArrayIndices(), AssemblyPC);
@@ -869,6 +869,7 @@ namespace ScannerParser {
                     res = new Result(Kind.REG, String.Format("({0})", AssemblyPC));
 
                 s.currLineNumber = AssemblyPC;
+                s.AddScope(scopes.Peek());
                 s.SetValue(scopes.Peek(), res);
             }
             return res;
@@ -898,7 +899,7 @@ namespace ScannerParser {
                 if (VerifyToken(Token.END, "Missing closing bracket of program")) {
                     Next();
                     if (VerifyToken(Token.PERIOD, "Unexpected end of program - missing period")) {
-                        instructionManager.PutBasicInstruction(Token.END, new Result(Kind.CONST, "DUmMYA"), new Result(Kind.CONST, "DUMMYB"), AssemblyPC);
+                        instructionManager.PutBasicInstruction(Token.END, new Result(Kind.CONST, ""), new Result(Kind.CONST, ""), AssemblyPC);
                         SSAWriter.sw.WriteLine("{0}: end", AssemblyPC++);
                         Console.WriteLine("{0}: end", AssemblyPC++);
 
@@ -1037,7 +1038,7 @@ namespace ScannerParser {
             VerifyToken(Token.DO, "No do keyword after the relation in while statement");
             Next(); // eat do
             if (res.condition != CondOp.ERR) {
-                //string negatedTokenString = TokenToInstruction(NegatedConditional(res.condition));
+                //string negatedTokenString = TokenToInstrusction(NegatedConditional(res.condition));
                 //PutF1(negatedTokenString, res, new Result(Kind.CONST, "offset")); //todo, fix for new PutF1 stuff
 
                 /* todo, for the case when a loop immediately follows another loop with no instructions
@@ -1143,6 +1144,7 @@ namespace ScannerParser {
                 }
 
             }
+
             if (scannerSym == Token.ARR) {
                 Next(); // eat  "array"
                 List<int> dims = new List<int>();
@@ -1229,7 +1231,8 @@ namespace ScannerParser {
 
         }
 
-        private Result MakeArrayReference(Result res) {
+        // outputChecks - if true, chk statemnts will be printed
+        private Result MakeArrayReference(Result res, bool outputChecks) {
             // find dimensions of array -- > requires symbol table look up
             int[] arrDims = GetArrayDimensions(res.GetValue());
 
@@ -1241,6 +1244,22 @@ namespace ScannerParser {
                 Next();
                 // evaluate indices
                 indexer[i] = Expression();
+
+
+                // Check validity of array index
+                if (indexer[i].type == Kind.CONST) {
+                    int index = Int32.Parse(indexer[i].GetValue());
+                    if (index >= arrDims[i])
+                        Error(String.Format("{0}: Array index {1} out of bounds ({2})", AssemblyPC, index, arrDims[i]));
+                } else if(outputChecks){
+                    // check at runtime
+                    Result bound = new Result(Kind.CONST, arrDims[i]);
+                    // put bounds in a register
+                    SSAWriter.PutChk(indexer[i], bound, AssemblyPC);
+                    instructionManager.PutBasicInstruction(Token.CHECK, indexer[i], bound, AssemblyPC);
+                    AssemblyPC++;
+
+                }
                 VerifyToken(Token.CLOSEBRACKET, "Array missing closing bracket");
                 Next();
             }
@@ -1274,7 +1293,7 @@ namespace ScannerParser {
             }
         }
 
-        private string TokenToInstruction(Token t) {
+        public static string TokenToInstruction(Token t) {
             string opString;
             switch (t) {
                 case Token.TIMES:
@@ -1308,6 +1327,19 @@ namespace ScannerParser {
                     break;
                 case Token.BRANCH:
                     opString = "bra";
+                    break;
+                case Token.OUTPUTNUM:
+                    opString = "write";
+                    break;
+                case Token.INPUTNUM:
+                    opString = "read";
+                    break;
+                case Token.OUTPUTNEWLINE:
+                    opString = "wrl";
+                    break;
+                case Token.END:
+                case Token.RETURN:
+                    opString = "ret";
                     break;
                 default:
                     opString = "nop";

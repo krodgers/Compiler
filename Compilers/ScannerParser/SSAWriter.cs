@@ -41,6 +41,11 @@ namespace ScannerParser {
             Console.WriteLine("{0}: {1} {2} {3}", lineNumber, op, b, a);
         }
 
+        // Writes out chk thingToCheck, upperBound
+        public static void PutChk(Result thingToCheck, Result upperBound, int lineNumber) {
+            sw.WriteLine("", lineNumber, thingToCheck.GetValue(), upperBound.GetValue());
+        }
+
         //////////////////////////////////////////////
         // Function Instructions
         //////////////////////////////////////////////

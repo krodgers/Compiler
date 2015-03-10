@@ -20,7 +20,7 @@ namespace ScannerParser {
         private StreamWriter sw;
         private int AssemblyPC, currRegister;
         private Dictionary<int,REG> ssaToReg; // maps ssa values to registers
-        private Dictionary<int, REG> varToReg; // maps vars to registers
+    //    private Dictionary<int, REG> varToReg; // maps vars to registers
         private List<REG> availableRegs;
         private Dictionary<string, int> symbols; // maps symbol string to ssaVals
 
@@ -35,7 +35,7 @@ namespace ScannerParser {
 
         private void init() {
             ssaToReg = new Dictionary<int, REG>();
-            varToReg = new Dictionary<int, REG>();
+           // varToReg = new Dictionary<int, REG>();
             availableRegs = new List<REG>();
             foreach (REG r in Enum.GetValues(typeof(REG))) {
                 if (r != REG.R0 && r != REG.FP && r != REG.SP && r != REG.RGLOBALS && r != REG.RA && r != REG.ERROR)
@@ -62,16 +62,22 @@ namespace ScannerParser {
         public void CodifyBlock(BasicBlock bb) {
             init(); 
             Instruction currInstr = bb.firstInstruction;
+            int numInstrUsed;
             while (currInstr != null) {
-                WriteInstruction(currInstr.opCode, currInstr);
-                currInstr = currInstr.next;
+                numInstrUsed = WriteInstruction(currInstr.opCode, currInstr);
+                if (numInstrUsed != 1) {
+                    for (int i = 0; i < numInstrUsed; i ++ )
+                        currInstr = currInstr.next;
+                } else
+                    currInstr = currInstr.next;
             }
         }
         
         ////////////////////////////////////
         //  General Instructions	      //
         ////////////////////////////////////
-        public void WriteInstruction(Token opCode, Instruction currInstr) {
+        // Returns the number of instructions consumed
+        public int WriteInstruction(Token opCode, Instruction currInstr) {
 
             switch (opCode) {
                 // math instructions
@@ -80,13 +86,15 @@ namespace ScannerParser {
                 case Token.PLUS:
                 case Token.MINUS:
                     HandleMathInstruction(opCode, currInstr);
-                    break;
+                    return 1;
+                    
                 // Memory Instructions
                 case Token.BECOMES:
                 case Token.STORE:
                 case Token.LOAD:
                     HandleMemoryInstruction(opCode, currInstr);
-                    break;
+                    return 1;
+                    
                 // Function Instruction
                 case Token.CALL:
                 case Token.END:
@@ -95,26 +103,31 @@ namespace ScannerParser {
                 case Token.OUTPUTNUM:
                 case Token.OUTPUTNEWLINE:
                     HandleFunctionInstruction(opCode, currInstr);
-                    break;
+                    return -1; // HOW MANY??
+                    
                 // Branching Instruction
                 case Token.BRANCH:
                 // Comparing Instruction
+                case Token.CHECK:
                 case Token.EQL:
                 case Token.NEQ:
                 case Token.LSS:
                 case Token.GEQ:
                 case Token.LEQ:
                 case Token.GTR:
-                    if (currInstr.secondOperandType == Instruction.OperandType.BRANCH)
+                    if (currInstr.secondOperandType == Instruction.OperandType.BRANCH) {
                         HandleBranchInstruction(opCode, currInstr);
-                    else
+                        return 1;
+                    } else {
                         HandleCompareInstruction(opCode, currInstr);
-                    break;
+                        return 2; // eats cmp _ _ and bra _ _ 
+                    }
+                    
                 default:
                     Error(String.Format("Unable to classify opcode {0}", opCode));
                     break;
             }
-
+            return -1;
         }
 
 
@@ -135,16 +148,16 @@ namespace ScannerParser {
                 cVal = (int) GetRegister(opC);
             }
             
-            PutMathInstruction(TokenToInstruction(opCode), storageReg, bVal, cVal, isImmediate);
+            PutMathInstruction(opCode, storageReg, bVal, cVal, isImmediate);
         }
 
         // puts opcode A B C
         // operandC has to be an int in case it's an immediate
-        private void PutMathInstruction(string opCode, REG whereToStore, REG operandB, int operandC, bool isImmediate) {
+        private void PutMathInstruction(Token opCode, REG whereToStore, REG operandB, int operandC, bool isImmediate) {
             if (isImmediate) 
-                Write(String.Format("{0}i {1} {2} {3}", opCode, (int)whereToStore, (int)operandB, operandC));
+                PutImmInstruction(opCode, (int)whereToStore, (int)operandB, operandC);
              else 
-                Write(String.Format("{0} {1} {2} {3}", opCode, (int)whereToStore, (int)operandB, operandC));
+                PutInstruction(opCode, (int)whereToStore, (int)operandB, operandC);
 
             
         }
@@ -160,7 +173,7 @@ namespace ScannerParser {
                     FunctionEntryCode(currInstr);
                     break;
                 case Token.END:
-                    Write("ret 0");
+                    PutImmInstruction(Token.RETURN, 0);
                     break;
                 case Token.RETURN:
                     FunctionExitCode(currInstr);
@@ -169,10 +182,10 @@ namespace ScannerParser {
                     Write("wrl");
                     break;
                 case Token.OUTPUTNUM:
-                    Write("wrd " + (int)GetRegister(currInstr.firstOperandSSAVal));
+                    PutInstruction(Token.OUTPUTNUM, (int)GetRegister(currInstr.firstOperandSSAVal));
                     break;
                 case Token.INPUTNUM:
-                    Write("rdd " + (int)GetRegister(currInstr.firstOperandSSAVal));
+                    PutInstruction(Token.INPUTNUM, (int)GetRegister(currInstr.firstOperandSSAVal));
                     break;
             }
         }
@@ -217,7 +230,8 @@ namespace ScannerParser {
                 AssignRegToSsaVal(newReg, currInstr.instructionNum);
 
                 if (CheckImmediateAndReorder(currInstr, out opA, out opB)) {
-                    PutMathInstruction("add", newReg, REG.R0, opB, true);
+                    // essentially a move
+                    PutConstantInRegister(newReg, opB);
                 } else {
                     // will return the register associated with this value
                     if (opB == 0) {
@@ -226,7 +240,7 @@ namespace ScannerParser {
                             REG variReg = GetAvailableReg();
                             AssignRegToSsaVal(variReg, currInstr.instructionNum);
                             AssignSSAToVar(currInstr.instructionNum, currInstr.secondOperand);
-                            PutMathInstruction("add", variReg, REG.R0, (int)GetRegister(opA), false);
+                            PutMathInstruction(Token.PLUS, variReg, REG.R0, (int)GetRegister(opA), false);
                         }
                     }
                
@@ -242,16 +256,70 @@ namespace ScannerParser {
         // Branching/Comparing  Instructions	    //
         //////////////////////////////////////////////
         private void HandleBranchInstruction(Token opCode, Instruction currInstr) {
-            
+            // Check for wrong opcode
+            switch (opCode) {
+                case Token.EQL:
+                case Token.NEQ:
+                case Token.LSS:
+                case Token.GEQ:
+                case Token.LEQ:
+                case Token.GTR:
+                    break;
+                default:
+                    Error("In compare but didn't get a compare opcode");
+                    break;
+            }  
+            int opA, opB;
+            if (CheckImmediateAndReorder(currInstr, out opA, out opB)) {
+                PutImmInstruction(opCode, (int)GetRegister(opA), opB);
+            } else {
+                Error("Branch instruction requires a constant");
+            }
         }
 
 
         private void HandleCompareInstruction(Token opCode, Instruction currInstr) {
-            throw new NotImplementedException();
+            // check for wrong opcode
+            switch (opCode) {
+                case Token.EQL:
+                case Token.NEQ:
+                case Token.LSS:
+                case Token.GEQ:
+                case Token.LEQ:
+                case Token.GTR:
+                default:
+                    Error("In compare but didn't get a compare opcode");
+                    break;
+            }
+
+            REG storage = GetAvailableReg();
+            int opA, opB;
+            REG A, B;
+            // put cmp instruction
+            if (CheckImmediateAndReorder(currInstr, out opA, out opB)) {
+                A = GetRegister(opA);
+                PutImmInstruction(opCode, (int)storage, (int)A, opB);
+            } else {
+                A = GetRegister(opA);
+                B = GetRegister(opB);
+                PutInstruction(opCode, (int)storage, (int)A, (int)B);
+            }
+            // put branch instruction
+            currInstr = currInstr.next;
+            // branch result location
+            if (CheckImmediateAndReorder(currInstr, out opA, out opB)) {
+                PutImmInstruction(opCode, (int)storage, opB);
+            } else {
+                Error("Branch instruction requires a constant");
+            }
+
+            // free the comparision registerx
+            ReleaseRegister(storage);
+
         }
 
 
-
+      
 
         ///////////////////////////////
         // Input/Output Instructions //
@@ -304,12 +372,43 @@ namespace ScannerParser {
         ///////////////////////////////////
         // Utilities                     //
         ///////////////////////////////////
+        private void PutInstruction(Token opcode, int A, int B, int C) {
+            sw.WriteLine(String.Format("{0} {1} {2} {3}", TokenToInstruction(opcode), A, B, C));
+            Console.WriteLine(String.Format("{0} {1} {2} {3}", TokenToInstruction(opcode), (REG)A, (REG)B, (REG)C));
 
+        }
+        private void PutImmInstruction(Token opcode, int A, int B, int C) {
+            sw.WriteLine(String.Format("{0}i {1} {2} {3}", TokenToInstruction(opcode), A, B, C));
+            Console.WriteLine(String.Format("{0}i {1} {2} #{3}", TokenToInstruction(opcode), (REG)A, (REG)B, C));
+        }
 
+        private void PutInstruction(Token opcode, int A, int B) {
+            sw.WriteLine(String.Format("{0} {1} {2}", TokenToInstruction(opcode), A, B));
+            Console.WriteLine(String.Format("{0} {1} {2}", TokenToInstruction(opcode), (REG)A, (REG)B));
+
+        }
+        private void PutImmInstruction(Token opcode, int A, int B) {
+            sw.WriteLine(String.Format("{0} {1} {2}", TokenToInstruction(opcode), A, B));
+            Console.WriteLine(String.Format("{0} {1} #{2}", TokenToInstruction(opcode), (REG)A, B));
+
+        }
+        private void PutInstruction(Token opcode, int A) {
+            sw.WriteLine(String.Format("{0} {1}", TokenToInstruction(opcode), A));
+            Console.WriteLine(String.Format("{0} {1}", TokenToInstruction(opcode), (REG)A));
+        }
+        private void PutImmInstruction(Token opcode, int A) {
+            sw.WriteLine(String.Format("{0} {1}", TokenToInstruction(opcode), A));
+            Console.WriteLine(String.Format("{0} #{1}", TokenToInstruction(opcode), A));
+        }
         private void Write(string toWrite) {
             sw.WriteLine(toWrite);
             Console.WriteLine(toWrite);
         }
+
+        private void PutConstantInRegister(REG storage, int constant) {
+            PutImmInstruction(Token.PLUS, (int)storage, 0, constant);
+        }
+
         // Returns the register associated with the ssaValue
         // ssaValue - ssa value associated with value wanted
         // type - operandtype of the value wanted
@@ -325,6 +424,7 @@ namespace ScannerParser {
        
         /// <summary>
         /// Checks if the instruction has a constant as a value. Reorders operands if needed.
+        ///  Returns the SSA val of anything not a constant
         /// </summary>
         /// <param name="instr"> The crrent instruction</param>
         /// <param name="opAValue"> out param: returns the SSA value of the operand</param>
@@ -337,8 +437,6 @@ namespace ScannerParser {
             if (instr.firstOperandType == Instruction.OperandType.CONSTANT && instr.secondOperandType == Instruction.OperandType.CONSTANT) {
                 Error("Both operands cannot be constants");
             }
-
-
             if (instr.firstOperandType == Instruction.OperandType.CONSTANT) {
                 immediate = true;
                 Debug.Assert(instr.secondOperandType != Instruction.OperandType.CONSTANT, "Both operands are constants");
@@ -359,47 +457,50 @@ namespace ScannerParser {
 
 
             return immediate;
-
-
         }
+        /// <summary>
+        /// Checks if both operands are constants
+        /// If so, puts one into a register
+        /// </summary>
+        /// <param name="instr"></param>
+        /// <param name="opAValue"> The SSA value of the registered value</param>
+        /// <param name="opBValue"> The value of the constant or the SSA value of a registerValue</param>
+        /// <returns> true if opBValue is a constant value</returns>
+        private bool CheckDoubleConstants(Instruction instr, out int opAValue, out int opBValue) {
+            bool immediate = false;
+
+            // Can't have both be constants
+            if (instr.firstOperandType == Instruction.OperandType.CONSTANT && instr.secondOperandType == Instruction.OperandType.CONSTANT) {
+               // load one into a register
+                REG storage = GetAvailableReg();
+
+            }
+            if (instr.firstOperandType == Instruction.OperandType.CONSTANT) {
+                immediate = true;
+                Debug.Assert(instr.secondOperandType != Instruction.OperandType.CONSTANT, "Both operands are constants");
+                opAValue = instr.secondOperandSSAVal;
+                opBValue = Int32.Parse(instr.firstOperand); // 1st operand is the immediate value
+
+
+            } else if (instr.secondOperandType == Instruction.OperandType.CONSTANT) {
+                immediate = true;
+                opAValue = instr.firstOperandSSAVal;
+                opBValue = Int32.Parse(instr.secondOperand);
+                Debug.Assert(instr.firstOperandType != Instruction.OperandType.CONSTANT, "Both operands are constants");
+            } else {
+                // no constants
+                opAValue = instr.firstOperandSSAVal;
+                opBValue = instr.secondOperandSSAVal;
+            }
+
+
+            return immediate;
+        }
+
 
         // Returns the instruction associated with the token
         private string TokenToInstruction(Token t) {
-            string opString;
-            switch (t) {
-                case Token.TIMES:
-                    opString = "mul";
-                    break;
-                case Token.DIV:
-                    opString = "div";
-                    break;
-                case Token.PLUS:
-                    opString = "add";
-                    break;
-                case Token.MINUS:
-                    opString = "sub";
-                    break;
-                case Token.LOAD:
-                    opString = "LD";
-                    break;
-                case Token.STORE:
-                    opString = "ST";
-                    break;
-                case Token.EQL:
-                case Token.NEQ:
-                case Token.LSS:
-                case Token.GEQ:
-                case Token.LEQ:
-                case Token.GTR:
-                    opString = "cmp";
-                    break;
-                default:
-                    Error(String.Format("Unknown Token {0} -- can't find instruction equivalent", t));
-                    opString = String.Empty; // to appease the compiler....
-                    break;
-
-            }
-            return opString;
+            return Parser.TokenToInstruction(t);
         }
 
         // Stores an argument at SP-4

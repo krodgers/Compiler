@@ -50,7 +50,7 @@ namespace ScannerParser {
         public override string ToString() {
             if (opCode == Token.ARR)
                 return String.Format("{0}: {1} {2} {3}", instructionNum, "adda", firstOperand, secondOperand);
-            return String.Format("{0}: {1} {2} {3}", instructionNum, opCode, firstOperand, secondOperand);
+            return String.Format("{0}: {1} {2} {3}", instructionNum, Parser.TokenToInstruction(opCode), firstOperand, secondOperand);
         }
 
 
