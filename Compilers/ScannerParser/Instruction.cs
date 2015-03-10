@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ScannerParser {
     public class Instruction {
-        public enum OperandType {SSA_VAL, CONSTANT, REG, VAR, IDENT, BRANCH, LABEL, ERROR}
+        public enum OperandType {SSA_VAL, CONSTANT, REG, VAR, IDENT, BRANCH, ERROR}
         public Result myResult;
         public int instructionNum { private set;  get; }
         public Instruction[] neededInstr; // instructions whose values this instruction needs
@@ -16,6 +16,8 @@ namespace ScannerParser {
         public Token opCode;
         public string firstOperand;
         public OperandType? firstOperandType;
+        // The secondOperand value will contain the number of a block which this instruction
+        // branches to, if this instruction is a branch
         public string secondOperand;
         public OperandType? secondOperandType;
         public int firstOperandSSAVal;
