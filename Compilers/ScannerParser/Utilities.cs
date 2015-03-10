@@ -56,5 +56,83 @@ namespace ScannerParser {
             return fs;
         }
 
+       // converts token to SSA instruction
+        public static string TokenToInstruction(Token t) {
+            string opString;
+            switch (t) {
+                case Token.TIMES:
+                    opString = "mul";
+                    break;
+                case Token.DIV:
+                    opString = "div";
+                    break;
+                case Token.PLUS:
+                    opString = "add";
+                    break;
+                case Token.MINUS:
+                    opString = "sub";
+                    break;
+                case Token.BECOMES:
+                    opString = "mov";
+                    break;
+                case Token.EQL:
+                case Token.NEQ:
+                case Token.LSS:
+                case Token.GEQ:
+                case Token.LEQ:
+                case Token.GTR:
+                    opString = "cmp";
+                    break;
+                case Token.LOAD:
+                    opString = "load";
+                    break;
+                case Token.STORE:
+                    opString = "store";
+                    break;
+                case Token.BRANCH:
+                    opString = "bra";
+                    break;
+                case Token.OUTPUTNUM:
+                    opString = "write";
+                    break;
+                case Token.INPUTNUM:
+                    opString = "read";
+                    break;
+                case Token.OUTPUTNEWLINE:
+                    opString = "wrl";
+                    break;
+                case Token.END:
+                case Token.RETURN:
+                    opString = "ret";
+                    break;
+                default:
+                    opString = "nop";
+                    break;
+
+            }
+            return opString;
+        }
+
+        // returns the negated form of the condition
+        public static Token NegatedConditional(Token cond) {
+            // todo, do we even need CondOp? It seems redundant
+            switch (cond) {
+                case Token.EQL:
+                    return Token.NEQ;
+                case Token.NEQ:
+                    return Token.EQL;
+                case Token.LSS:
+                    return Token.GEQ;
+                case Token.GTR:
+                    return Token.LEQ;
+                case Token.LEQ:
+                    return Token.GTR;
+                case Token.GEQ:
+                    return Token.LSS;
+                default:
+                    return Token.ERROR;
+            }
+        }
+
     }
 }

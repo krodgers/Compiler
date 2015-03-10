@@ -453,7 +453,7 @@ namespace ScannerParser {
                     res = Relation();
                     if (VerifyToken(Token.THEN, "The then keyword did not follow the relation in if statement")) {
                         if (res.condition != CondOp.ERR) {
-                            //string negatedTokenString = TokenToInstruction(NegatedConditional(res.condition));
+                            //string negatedTokenString = Utilities.TokenToInstruction(Utilities.NegatedConditional(res.condition));
                             //PutF1(negatedTokenString, res, new Result(Kind.CONST, "offset")); //todo, need to fix for new PutF1 stuff
                         }
                         else {
@@ -707,7 +707,7 @@ namespace ScannerParser {
             VerifyToken(Token.DO, "No do keyword after the relation in while statement");
             Next(); // eat do
             if (res.condition != CondOp.ERR) {
-                //string negatedTokenString = TokenToInstruction(NegatedConditional(res.condition));
+                //string negatedTokenString = Utilities.TokenToInstruction(Utilities.NegatedConditional(res.condition));
                 //PutF1(negatedTokenString, res, new Result(Kind.CONST, "offset")); //todo, fix for new PutF1 stuff
 
                 /* todo, for the case when a loop immediately follows another loop with no instructions
@@ -869,7 +869,7 @@ namespace ScannerParser {
                     case OpCodeClass.ARITHMETIC_REG:
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
-                        res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
+                        res = SSAWriter.PutArithmeticRegInstruction(Utilities.TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
@@ -881,21 +881,21 @@ namespace ScannerParser {
 
                         // branch
                         oldAssemblyPC = AssemblyPC;
-                        Token newOP = NegatedConditional(opCode);
+                        Token newOP = Utilities.NegatedConditional(opCode);
                         string label = "FALSE_" + curBasicBlock.blockNum;
                         instructionManager.PutConditionalBranch(newOP, res, label, AssemblyPC);
-                        SSAWriter.PutConditionalBranch(TokenToInstruction(newOP), res, label, AssemblyPC++);
+                        SSAWriter.PutConditionalBranch(Utilities.TokenToInstruction(newOP), res, label, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                 }
-                //PutF2(TokenToInstruction(opCode), loadednewA loadedB);
+                //PutF2(Utilities.TokenToInstruction(opCode), loadednewA loadedB);
             }
             else if (newA.type == Kind.VAR && newB.type == Kind.CONST) {
                 switch (GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
-                        res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
+                        res = SSAWriter.PutArithmeticImmInstruction(Utilities.TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
@@ -907,14 +907,14 @@ namespace ScannerParser {
 
                         // branch
                         oldAssemblyPC = AssemblyPC;
-                        Token newOP = NegatedConditional(opCode);
+                        Token newOP = Utilities.NegatedConditional(opCode);
                         string label = "FALSE_" + curBasicBlock.blockNum;
                         instructionManager.PutConditionalBranch(newOP, res, label, AssemblyPC);
-                        SSAWriter.PutConditionalBranch(TokenToInstruction(newOP), res, label, AssemblyPC++);
+                        SSAWriter.PutConditionalBranch(Utilities.TokenToInstruction(newOP), res, label, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                 }
-                //PutF1(TokenToInstruction(opCode) + "i", loadednewA B);
+                //PutF1(Utilities.TokenToInstruction(opCode) + "i", loadednewA B);
 
             }
             else if (newA.type == Kind.REG && newB.type == Kind.CONST) {
@@ -922,7 +922,7 @@ namespace ScannerParser {
                     case OpCodeClass.ARITHMETIC_IMM:
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
-                        res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
+                        res = SSAWriter.PutArithmeticImmInstruction(Utilities.TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
@@ -934,14 +934,14 @@ namespace ScannerParser {
 
                         // branch
                         oldAssemblyPC = AssemblyPC;
-                        Token newOP = NegatedConditional(opCode);
+                        Token newOP = Utilities.NegatedConditional(opCode);
                         string label = "FALSE_" + curBasicBlock.blockNum;
                         instructionManager.PutConditionalBranch(newOP, res, label, AssemblyPC);
-                        SSAWriter.PutConditionalBranch(TokenToInstruction(newOP), res, label, AssemblyPC++);
+                        SSAWriter.PutConditionalBranch(Utilities.TokenToInstruction(newOP), res, label, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                 }
-                //PutF1(TokenToInstruction(opCode) + "i", loadednewA B);
+                //PutF1(Utilities.TokenToInstruction(opCode) + "i", loadednewA B);
 
             }
             else if (newA.type == Kind.VAR && newB.type == Kind.REG) {
@@ -951,7 +951,7 @@ namespace ScannerParser {
                     case OpCodeClass.ARITHMETIC_REG:
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
-                        res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
+                        res = SSAWriter.PutArithmeticRegInstruction(Utilities.TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
@@ -963,14 +963,14 @@ namespace ScannerParser {
 
                         // branch
                         oldAssemblyPC = AssemblyPC;
-                        Token newOP = NegatedConditional(opCode);
+                        Token newOP = Utilities.NegatedConditional(opCode);
                         string label = "FALSE_" + curBasicBlock.blockNum;
                         instructionManager.PutConditionalBranch(newOP, res, label, AssemblyPC);
-                        SSAWriter.PutConditionalBranch(TokenToInstruction(newOP), res, label, AssemblyPC++);
+                        SSAWriter.PutConditionalBranch(Utilities.TokenToInstruction(newOP), res, label, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                 }
-                //PutF2(TokenToInstruction(opCode), loadednewA B);
+                //PutF2(Utilities.TokenToInstruction(opCode), loadednewA B);
 
             }
             else if (newB.type == Kind.REG && newA.type == Kind.REG) {
@@ -979,7 +979,7 @@ namespace ScannerParser {
                     case OpCodeClass.ARITHMETIC_REG:
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
-                        res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
+                        res = SSAWriter.PutArithmeticRegInstruction(Utilities.TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
@@ -991,14 +991,14 @@ namespace ScannerParser {
 
                         // branch
                         oldAssemblyPC = AssemblyPC;
-                        Token newOP = NegatedConditional(opCode);
+                        Token newOP = Utilities.NegatedConditional(opCode);
                         string label = "FALSE_" + curBasicBlock.blockNum;
                         instructionManager.PutConditionalBranch(newOP, res, label, AssemblyPC);
-                        SSAWriter.PutConditionalBranch(TokenToInstruction(newOP), res, label, AssemblyPC++);
+                        SSAWriter.PutConditionalBranch(Utilities.TokenToInstruction(newOP), res, label, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                 }
-                //PutF2(TokenToInstruction(opCode), loadednewB, loadedA);
+                //PutF2(Utilities.TokenToInstruction(opCode), loadednewB, loadedA);
             }
             else if (newB.type == Kind.VAR && newA.type == Kind.CONST) {
 
@@ -1006,7 +1006,7 @@ namespace ScannerParser {
                     case OpCodeClass.ARITHMETIC_IMM:
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
-                        res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), newB, newA, AssemblyPC++);
+                        res = SSAWriter.PutArithmeticImmInstruction(Utilities.TokenToInstruction(opCode), newB, newA, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
@@ -1018,14 +1018,14 @@ namespace ScannerParser {
 
                         // branch
                         oldAssemblyPC = AssemblyPC;
-                        Token newOP = NegatedConditional(opCode);
+                        Token newOP = Utilities.NegatedConditional(opCode);
                         string label = "FALSE_" + curBasicBlock.blockNum;
                         instructionManager.PutConditionalBranch(newOP, res, label, AssemblyPC);
-                        SSAWriter.PutConditionalBranch(TokenToInstruction(newOP), res, label, AssemblyPC++);
+                        SSAWriter.PutConditionalBranch(Utilities.TokenToInstruction(newOP), res, label, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                 }
-                //PutF1(TokenToInstruction(opCode) + "i", loadednewB, A);
+                //PutF1(Utilities.TokenToInstruction(opCode) + "i", loadednewB, A);
 
             }
             else if (newB.type == Kind.VAR && newA.type == Kind.REG) {
@@ -1034,7 +1034,7 @@ namespace ScannerParser {
                     case OpCodeClass.ARITHMETIC_REG:
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
-                        res = SSAWriter.PutArithmeticRegInstruction(TokenToInstruction(opCode), newA, newB, AssemblyPC++);
+                        res = SSAWriter.PutArithmeticRegInstruction(Utilities.TokenToInstruction(opCode), newA, newB, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
@@ -1046,14 +1046,14 @@ namespace ScannerParser {
 
                         // branch
                         oldAssemblyPC = AssemblyPC;
-                        Token newOP = NegatedConditional(opCode);
+                        Token newOP = Utilities.NegatedConditional(opCode);
                         string label = "FALSE_" + curBasicBlock.blockNum;
                         instructionManager.PutConditionalBranch(newOP, res, label, AssemblyPC);
-                        SSAWriter.PutConditionalBranch(TokenToInstruction(newOP), res, label, AssemblyPC++);
+                        SSAWriter.PutConditionalBranch(Utilities.TokenToInstruction(newOP), res, label, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                 }
-                //PutF2(TokenToInstruction(opCode), loadednewB, A);
+                //PutF2(Utilities.TokenToInstruction(opCode), loadednewB, A);
 
             }
             else if (newB.type == Kind.REG && newA.type == Kind.CONST) {
@@ -1061,7 +1061,7 @@ namespace ScannerParser {
                     case OpCodeClass.ARITHMETIC_IMM:
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
-                        res = SSAWriter.PutArithmeticImmInstruction(TokenToInstruction(opCode), newB, newA, AssemblyPC++);
+                        res = SSAWriter.PutArithmeticImmInstruction(Utilities.TokenToInstruction(opCode), newB, newA, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
@@ -1073,10 +1073,10 @@ namespace ScannerParser {
 
                         // branch
                         oldAssemblyPC = AssemblyPC;
-                        Token newOP = NegatedConditional(opCode);
+                        Token newOP = Utilities.NegatedConditional(opCode);
                         string label = "FALSE_" + curBasicBlock.blockNum;
                         instructionManager.PutConditionalBranch(newOP, res, label, AssemblyPC);
-                        SSAWriter.PutConditionalBranch(TokenToInstruction(newOP), res, label, AssemblyPC++);
+                        SSAWriter.PutConditionalBranch(Utilities.TokenToInstruction(newOP), res, label, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                 }
@@ -1533,81 +1533,6 @@ namespace ScannerParser {
             }
         }
 
-        public static string TokenToInstruction(Token t) {
-            string opString;
-            switch (t) {
-                case Token.TIMES:
-                    opString = "mul";
-                    break;
-                case Token.DIV:
-                    opString = "div";
-                    break;
-                case Token.PLUS:
-                    opString = "add";
-                    break;
-                case Token.MINUS:
-                    opString = "sub";
-                    break;
-                case Token.BECOMES:
-                    opString = "mov";
-                    break;
-                case Token.EQL:
-                case Token.NEQ:
-                case Token.LSS:
-                case Token.GEQ:
-                case Token.LEQ:
-                case Token.GTR:
-                    opString = "cmp";
-                    break;
-                case Token.LOAD:
-                    opString = "load";
-                    break;
-                case Token.STORE:
-                    opString = "store";
-                    break;
-                case Token.BRANCH:
-                    opString = "bra";
-                    break;
-                case Token.OUTPUTNUM:
-                    opString = "write";
-                    break;
-                case Token.INPUTNUM:
-                    opString = "read";
-                    break;
-                case Token.OUTPUTNEWLINE:
-                    opString = "wrl";
-                    break;
-                case Token.END:
-                case Token.RETURN:
-                    opString = "ret";
-                    break;
-                default:
-                    opString = "nop";
-                    break;
-
-            }
-            return opString;
-        }
-
-        private Token NegatedConditional(Token cond) {
-            // todo, do we even need CondOp? It seems redundant
-            switch (cond) {
-                case Token.EQL:
-                    return Token.NEQ;
-                case Token.NEQ:
-                    return Token.EQL;
-                case Token.LSS:
-                    return Token.GEQ;
-                case Token.GTR:
-                    return Token.LEQ;
-                case Token.LEQ:
-                    return Token.GTR;
-                case Token.GEQ:
-                    return Token.LSS;
-                default:
-                    return Token.ERROR;
-            }
-        }
 
         private void IncrementLoopCounters(int oldPC, int newPC)
         {
