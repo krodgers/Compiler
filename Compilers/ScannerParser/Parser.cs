@@ -422,9 +422,9 @@ namespace ScannerParser {
                     Next(); // eat ) 
                     oldAssemblyPC = AssemblyPC;
                     res = new Result(Kind.REG, String.Format("({0})", AssemblyPC));
+                    instructionManager.PutBasicInstruction(Token.INPUTNUM, res, new Result(Kind.CONST, ""), AssemblyPC);
                     SSAWriter.sw.WriteLine("{0}: read", AssemblyPC);
                     Console.WriteLine("{0}: read  ", AssemblyPC++);
-                    instructionManager.PutBasicInstruction(Token.INPUTNUM, res, new Result(Kind.CONST, ""), AssemblyPC);
                     IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
 
                     //sw.WriteLine("RDD {0}", res.regNo);
