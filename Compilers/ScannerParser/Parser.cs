@@ -57,6 +57,8 @@ namespace ScannerParser {
         private List<int> loopCounters;
         private int oldAssemblyPC;
 
+        private Dotifier dotty;
+
 
 
         public Parser(String file) {
@@ -83,6 +85,8 @@ namespace ScannerParser {
             trueBlock = falseBlock = joinBlock = null;
             flowGraphNodes = new Dictionary<int, BasicBlock>();
             loopCounters = new List<int>();
+
+            
         }
 
         // Sets initial state of parser
@@ -110,14 +114,14 @@ namespace ScannerParser {
 
         public BasicBlock StartFirstPass() {
 
-            entryBlock = new BasicBlock(nextBBid++);
+            entryBlock = new BasicBlock(0);
             entryBlock.blockLabel = "ENTRY";
             flowGraphNodes[entryBlock.blockNum] = entryBlock;
             entryBlock.childBlocks = new List<BasicBlock>();
             entryBlock.parentBlocks = new List<BasicBlock>();
             entryBlock.blockType = BasicBlock.BlockType.ENTRY;
 
-            exitBlock = new BasicBlock(nextBBid++);
+            exitBlock = new BasicBlock(0);
             exitBlock.blockLabel = "EXIT";
             flowGraphNodes[entryBlock.blockNum] = exitBlock;
             exitBlock.childBlocks = new List<BasicBlock>();
@@ -136,9 +140,11 @@ namespace ScannerParser {
             curBasicBlock = rootBasicBlock;
             instructionManager.setCurrentBlock(curBasicBlock);
 
-            instructionManager.setCurrentBlock(curBasicBlock);
-
             Main();
+
+            dotty = new Dotifier(flowGraphNodes);
+            dotty.WriteAllBlocksToDot("if_while_test", curBasicBlock.blockNum);
+            dotty.WriteDominatorTree("if_while_test");
 
             return entryBlock;
         }
@@ -299,6 +305,8 @@ namespace ScannerParser {
 
             VerifyToken(Token.CALL, "Ended up at FuncCall but didn't recieve the keyword call");
             Next();
+
+
 
             switch (scannerSym) {
                 case Token.IDENT:
@@ -475,6 +483,7 @@ namespace ScannerParser {
                         joinBlock.childBlocks = new List<BasicBlock>();
                         joinBlock.parentBlocks = new List<BasicBlock>();
                         joinBlock.nestingLevel = globalNestingLevel;
+                        joinBlock.dominatingBlock = curBasicBlock;
                         joinBlocks.Push(joinBlock);
 
                         // todo, I think the current block needs to be pushed here, not the joinBlock
@@ -494,6 +503,7 @@ namespace ScannerParser {
                         trueBlock.parentBlocks.Add(curBasicBlock);
                         //trueBlock.childBlocks.Add(joinBlock);
                         trueBlock.nestingLevel = globalNestingLevel;
+                        trueBlock.dominatingBlock = curBasicBlock;
                         curBasicBlock.childBlocks.Add(trueBlock);
                         curBasicBlock = trueBlock;
                         instructionManager.setCurrentBlock(curBasicBlock);
@@ -502,6 +512,14 @@ namespace ScannerParser {
                         scopes.Push(nextScopeNumber++);
 
                         StatSequence();
+
+                        if (curBasicBlock.blockType == BasicBlock.BlockType.FOLLOW)
+                        {
+                            curBasicBlock.childBlocks.Add(joinBlock);
+                            // Insert the branch that will get us back to the header at the end of the loop
+                            instructionManager.PutUnconditionalBranch(Token.BRANCH, joinBlock.blockNum, AssemblyPC++);
+
+                        }
                         
                         curBasicBlock = parentBlocks.Pop();
                         instructionManager.setCurrentBlock(curBasicBlock);
@@ -519,6 +537,7 @@ namespace ScannerParser {
                             falseBlock.parentBlocks = new List<BasicBlock>();
                             falseBlock.parentBlocks.Add(curBasicBlock);
                             falseBlock.nestingLevel = globalNestingLevel;
+                            falseBlock.dominatingBlock = curBasicBlock;
                             curBasicBlock.childBlocks.Add(falseBlock);
 
                             // Fix up the branch at the end of the if block so that
@@ -540,6 +559,13 @@ namespace ScannerParser {
                             Next();
 
                             StatSequence();
+
+                            if (curBasicBlock.blockType == BasicBlock.BlockType.FOLLOW) {
+                                curBasicBlock.childBlocks.Add(joinBlock);
+                                // Insert the branch that will get us back to the header at the end of the loop
+                                instructionManager.PutUnconditionalBranch(Token.BRANCH, joinBlock.blockNum, AssemblyPC++);
+
+                            }
                             
                             curBasicBlock = parentBlocks.Pop();
                             instructionManager.setCurrentBlock(curBasicBlock);
@@ -647,21 +673,26 @@ namespace ScannerParser {
                             scopes.Push(nextScopeNumber++);
                             while (joinBlocks.Peek().blockNum > joinBlock.blockNum) {
                                 BasicBlock tmp = joinBlocks.Pop();
-                                tmp.childBlocks.Add(joinBlock);
 
-                                // If we are still within a conditional, we need to branch from the end
-                                // of the join block to its child joinBlock
+                                if (tmp.childBlocks.Count <= 0)
+                                {
+                                    tmp.childBlocks.Add(joinBlock);
 
-                                // First set the instruction manager to the parent join block
-                                instructionManager.setCurrentBlock(tmp);
+                                    // If we are still within a conditional, we need to branch from the end
+                                    // of the join block to its child joinBlock
 
-                                // Insert the branch that will get us back to the header at the end of the loop
-                                instructionManager.PutUnconditionalBranch(Token.BRANCH, joinBlock.blockNum, AssemblyPC++);
+                                    // First set the instruction manager to the parent join block
+                                    instructionManager.setCurrentBlock(tmp);
 
-                                // Switch the instruction manager back to the current block
-                                instructionManager.setCurrentBlock(curBasicBlock);
+                                    // Insert the branch that will get us back to the header at the end of the loop
+                                    instructionManager.PutUnconditionalBranch(Token.BRANCH, joinBlock.blockNum,
+                                        AssemblyPC++);
 
-                                joinBlock.parentBlocks.Add(tmp);
+                                    // Switch the instruction manager back to the current block
+                                    instructionManager.setCurrentBlock(curBasicBlock);
+
+                                    joinBlock.parentBlocks.Add(tmp);
+                                }
                             }
                             globalNestingLevel--;
                             Next();
@@ -689,23 +720,31 @@ namespace ScannerParser {
             VerifyToken(Token.WHILE, "Got to while statement without seeing the while keyword");
             Next(); // eat while
 
+            scopes.Pop();
+
             // Create the header block for this loop
             BasicBlock loopHeaderBlock = new BasicBlock(nextBBid++);
             flowGraphNodes[loopHeaderBlock.blockNum] = loopHeaderBlock;
             loopHeaderBlock.childBlocks = new List<BasicBlock>();
             loopHeaderBlock.parentBlocks = new List<BasicBlock>();
             loopHeaderBlock.nestingLevel = globalNestingLevel;
+            loopHeaderBlock.dominatingBlock = curBasicBlock;
             loopHeaderBlock.blockType = BasicBlock.BlockType.LOOP_HEADER;
             loopHeaderBlock.parentBlocks.Add(curBasicBlock);
             curBasicBlock.childBlocks.Add(loopHeaderBlock);
             curBasicBlock = loopHeaderBlock;
             instructionManager.setCurrentBlock(curBasicBlock);
-            curBasicBlock.scopeNumber = nextScopeNumber++;
+            curBasicBlock.scopeNumber = nextScopeNumber;
+            scopes.Push(nextScopeNumber++);
             loopHeaderBlocks.Push(curBasicBlock);
             globalNestingLevel++;
 
             Result res = Relation();
             // After relation is called, the branch location will be wrong, so we must reset it at some point
+
+            // Pop the header off the scope stack as the only code that will be added to it is the
+            // unconditional branch and that doesn't depend on scope
+            scopes.Pop();
 
             VerifyToken(Token.DO, "No do keyword after the relation in while statement");
             Next(); // eat do
@@ -724,14 +763,18 @@ namespace ScannerParser {
                 loopBodyBlock.childBlocks = new List<BasicBlock>();
                 loopBodyBlock.parentBlocks = new List<BasicBlock>();
                 loopBodyBlock.nestingLevel = globalNestingLevel;
+                loopBodyBlock.dominatingBlock = loopHeaderBlock;
                 loopBodyBlock.blockType = BasicBlock.BlockType.LOOP_BODY;
                 loopBodyBlock.parentBlocks.Add(curBasicBlock);
                 curBasicBlock.childBlocks.Add(loopBodyBlock);
                 curBasicBlock = loopBodyBlock;
                 instructionManager.setCurrentBlock(curBasicBlock);
-                curBasicBlock.scopeNumber = nextScopeNumber++;
+                curBasicBlock.scopeNumber = nextScopeNumber;
+                scopes.Push(nextScopeNumber++);
 
                 StatSequence();
+
+                scopes.Pop();
 
 
                 // todo, here we will need a branch to loop header
@@ -754,19 +797,21 @@ namespace ScannerParser {
                 loopFollowBlock.childBlocks = new List<BasicBlock>();
                 loopFollowBlock.parentBlocks = new List<BasicBlock>();
                 loopFollowBlock.nestingLevel = globalNestingLevel;
+                loopFollowBlock.dominatingBlock = loopHeaderBlock;
                 loopFollowBlock.blockType = BasicBlock.BlockType.FOLLOW;
                 loopFollowBlock.parentBlocks.Add(correspondingHeaderBlock);
                 correspondingHeaderBlock.childBlocks.Add(loopFollowBlock);
                 curBasicBlock = loopFollowBlock;
                 instructionManager.setCurrentBlock(curBasicBlock);
-                curBasicBlock.scopeNumber = nextScopeNumber++;
+                curBasicBlock.scopeNumber = nextScopeNumber;
+                scopes.Push(nextScopeNumber++);
 
                 // Link the branch at the end of the header to the follow block
                 Instruction branchToInstruction = correspondingHeaderBlock.firstInstruction;
                 while (branchToInstruction.next != null)
                     branchToInstruction = branchToInstruction.next;
 
-                branchToInstruction.secondOperand = correspondingHeaderBlock.blockNum.ToString();
+                branchToInstruction.secondOperand = loopFollowBlock.blockNum.ToString();
 
 
                 Next(); //eat od
@@ -1228,6 +1273,16 @@ namespace ScannerParser {
 
             VerifyToken(Token.IDENT, "Function/Procedure declaration missing a name");
 
+            //BasicBlock functionStart = new BasicBlock(nextBBid++);
+            //flowGraphNodes[functionStart.blockNum] = functionStart;
+            //functionStart.childBlocks = new List<BasicBlock>();
+            //functionStart.parentBlocks = new List<BasicBlock>();
+            //functionStart.nestingLevel = globalNestingLevel;
+            //functionStart.blockType = BasicBlock.BlockType.FUNCTION_HEADER;
+            //curBasicBlock = functionStart;
+            //instructionManager.setCurrentBlock(functionStart);
+            //curBasicBlock.scopeNumber = nextScopeNumber;
+
             FunctionSymbol function;
             if (scopes.Peek() == 1) { // function is in global scope as well as local scope
                 function = new FunctionSymbol(funcType, scanner.id, AssemblyPC, scopes.Peek());
@@ -1240,6 +1295,7 @@ namespace ScannerParser {
                 function = new FunctionSymbol(funcType, scanner.id, AssemblyPC, scopes.Peek());
             }
             AddToSymbolTable(function, scopes.Peek());
+            //functionStart.blockLabel = scanner.Id2String(function.identID);
 
             SSAWriter.sw.WriteLine("{0}:", scanner.Id2String(function.identID).ToUpper());
             Console.WriteLine("{0}:", scanner.Id2String(function.identID).ToUpper());
