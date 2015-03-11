@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ScannerParser {
     public class BasicBlock {
-        public enum BlockType {ENTRY, STANDARD, TRUE, FALSE, JOIN, LOOP_HEADER, FOLLOW, LOOP_BODY, EXIT, FUNCTION_HEADER}
+        public enum BlockType {ENTRY, STANDARD, TRUE, FALSE, JOIN, LOOP_HEADER, FOLLOW, LOOP_BODY, EXIT, FUNCTION_HEADER, FUNCTION_CALL, MAIN_ENTRY}
         public int blockNum { set; get; } // which block this is
         public string blockLabel;
         public Instruction firstInstruction;// 

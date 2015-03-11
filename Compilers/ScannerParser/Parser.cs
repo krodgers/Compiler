@@ -114,32 +114,6 @@ namespace ScannerParser {
 
         public BasicBlock StartFirstPass() {
 
-            entryBlock = new BasicBlock(0);
-            entryBlock.blockLabel = "ENTRY";
-            flowGraphNodes[entryBlock.blockNum] = entryBlock;
-            entryBlock.childBlocks = new List<BasicBlock>();
-            entryBlock.parentBlocks = new List<BasicBlock>();
-            entryBlock.blockType = BasicBlock.BlockType.ENTRY;
-
-            exitBlock = new BasicBlock(0);
-            exitBlock.blockLabel = "EXIT";
-            flowGraphNodes[entryBlock.blockNum] = exitBlock;
-            exitBlock.childBlocks = new List<BasicBlock>();
-            exitBlock.parentBlocks = new List<BasicBlock>();
-            exitBlock.blockType = BasicBlock.BlockType.EXIT;
-            entryBlock.childBlocks.Add(exitBlock);
-
-            rootBasicBlock = new BasicBlock(nextBBid++);
-            rootBasicBlock.blockLabel = "MAIN:";
-            flowGraphNodes[rootBasicBlock.blockNum] = rootBasicBlock;
-            rootBasicBlock.childBlocks = new List<BasicBlock>();
-            rootBasicBlock.parentBlocks = new List<BasicBlock>();
-            rootBasicBlock.nestingLevel = globalNestingLevel;
-            rootBasicBlock.blockType = BasicBlock.BlockType.STANDARD;
-            entryBlock.childBlocks.Add(rootBasicBlock);
-            curBasicBlock = rootBasicBlock;
-            instructionManager.setCurrentBlock(curBasicBlock);
-
             Main();
 
             dotty = new Dotifier(flowGraphNodes);
@@ -307,9 +281,26 @@ namespace ScannerParser {
             Next();
 
 
+            BasicBlock callBlock = new BasicBlock(nextBBid++);
+            flowGraphNodes[callBlock.blockNum] = callBlock;
+            callBlock.childBlocks = new List<BasicBlock>();
+            callBlock.parentBlocks = new List<BasicBlock>();
+            callBlock.blockType = BasicBlock.BlockType.FUNCTION_CALL;
+            callBlock.scopeNumber = scopes.Peek();
+
+            BasicBlock afterBlock = new BasicBlock(nextBBid++);
+            flowGraphNodes[afterBlock.blockNum] = afterBlock;
+            afterBlock.childBlocks = new List<BasicBlock>();
+            afterBlock.parentBlocks = new List<BasicBlock>();
+            afterBlock.blockType = BasicBlock.BlockType.STANDARD;
+            afterBlock.scopeNumber = scopes.Peek(); // todo, it seems to me that the scope should switch when we call a function, maybe? Idon't know, too tired
+            callBlock.childBlocks.Add(afterBlock);
+            afterBlock.parentBlocks.Add(callBlock);
+
 
             switch (scannerSym) {
                 case Token.IDENT:
+                    callBlock.blockLabel = scanner.Id2String(scanner.id);
                     res = Ident();
 
                     // Verify function is in scope
@@ -378,6 +369,12 @@ namespace ScannerParser {
                         if (symbolTable[scanner.String2Id(res.GetValue())].type == Token.FUNC) {
                             res = new Result(Kind.REG, "EAX"); // going to call return register EAX
                         }
+
+                        curBasicBlock.childBlocks.Add(callBlock);
+                        callBlock.parentBlocks.Add(curBasicBlock);
+
+                        curBasicBlock = afterBlock;
+                        instructionManager.setCurrentBlock(afterBlock);
                     }
                     else {
                         scanner.Error(String.Format("Tried to call an undefined function : {0}", res.GetValue()));
@@ -385,6 +382,7 @@ namespace ScannerParser {
                     break;
 
                 case Token.OUTPUTNEWLINE:
+                    callBlock.blockLabel = "OutputNewLine";
                     Next(); // eat OutputNewLine()
                     VerifyToken(Token.OPENPAREN, "Called OutputNewLine, missing (");
                     Next(); // eat (
@@ -397,9 +395,16 @@ namespace ScannerParser {
                     Console.WriteLine("{0}: wln", AssemblyPC++);
                     IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
 
+                    curBasicBlock.childBlocks.Add(callBlock);
+                    callBlock.parentBlocks.Add(curBasicBlock);
+                    
+                    curBasicBlock = afterBlock;
+                    instructionManager.setCurrentBlock(afterBlock);
+
                     break;
 
                 case Token.OUTPUTNUM:
+                    callBlock.blockLabel = "OutputNum";
                     Next(); // eat OutputNum
                     VerifyToken(Token.OPENPAREN, "OutputNum missing (");
                     Next();
@@ -419,10 +424,16 @@ namespace ScannerParser {
                     VerifyToken(Token.CLOSEPAREN, "OutputNum missing )");
                     Next(); // eat )
 
+                    curBasicBlock.childBlocks.Add(callBlock);
+                    callBlock.parentBlocks.Add(curBasicBlock);
+                    curBasicBlock = afterBlock;
+                    instructionManager.setCurrentBlock(afterBlock);
+
                     break;
 
 
                 case Token.INPUTNUM:
+                    callBlock.blockLabel = "InputNum";
                     Next(); // eat InputNum
                     VerifyToken(Token.OPENPAREN, "InputNum missing (");
                     Next(); // eat (
@@ -434,6 +445,11 @@ namespace ScannerParser {
                     SSAWriter.sw.WriteLine("{0}: read", AssemblyPC);
                     Console.WriteLine("{0}: read  ", AssemblyPC++);
                     IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
+
+                    curBasicBlock.childBlocks.Add(callBlock);
+                    callBlock.parentBlocks.Add(curBasicBlock);
+                    curBasicBlock = afterBlock;
+                    instructionManager.setCurrentBlock(afterBlock);
 
                     //sw.WriteLine("RDD {0}", res.regNo);
                     break;
@@ -507,9 +523,7 @@ namespace ScannerParser {
                         curBasicBlock.childBlocks.Add(trueBlock);
                         curBasicBlock = trueBlock;
                         instructionManager.setCurrentBlock(curBasicBlock);
-                        curBasicBlock.scopeNumber = nextScopeNumber;
-                        Debug.WriteLine("Push scope: {0}", nextScopeNumber);
-                        scopes.Push(nextScopeNumber++);
+                        curBasicBlock.scopeNumber = scopes.Peek();
 
                         StatSequence();
 
@@ -524,8 +538,6 @@ namespace ScannerParser {
                         
                         curBasicBlock = parentBlocks.Pop();
                         instructionManager.setCurrentBlock(curBasicBlock);
-                        var tmpScope = scopes.Pop();
-                        Debug.WriteLine("Popped scope: {0}", tmpScope);
 
                         BasicBlock falseBlock = null;
                         if (scannerSym == Token.ELSE) {
@@ -554,9 +566,7 @@ namespace ScannerParser {
 
                             curBasicBlock = falseBlock;
                             instructionManager.setCurrentBlock(curBasicBlock);
-                            curBasicBlock.scopeNumber = nextScopeNumber;
-                            Debug.WriteLine("Push scope: {0}", nextScopeNumber);
-                            scopes.Push(nextScopeNumber++);
+                            curBasicBlock.scopeNumber = scopes.Peek();
                             Next();
 
                             StatSequence();
@@ -571,8 +581,6 @@ namespace ScannerParser {
                             
                             curBasicBlock = parentBlocks.Pop();
                             instructionManager.setCurrentBlock(curBasicBlock);
-                            tmpScope = scopes.Pop();
-                            Debug.WriteLine("Popped scope: {0}", tmpScope);
                             elseOccurred = true;
                         }
                         if (scannerSym == Token.FI) {
@@ -671,11 +679,8 @@ namespace ScannerParser {
                             joinBlock.joinPredecessorInstructionCount = curBasicBlock.instructionCount;
                             curBasicBlock = joinBlock;
                             instructionManager.setCurrentBlock(curBasicBlock);
-                            curBasicBlock.scopeNumber = nextScopeNumber;
-                            tmpScope = scopes.Pop();
-                            Debug.WriteLine("Popped scope: {0}", tmpScope);
-                            Debug.WriteLine("Push scope: {0}", nextScopeNumber);
-                            scopes.Push(nextScopeNumber++);
+                            curBasicBlock.scopeNumber = scopes.Peek();
+
                             while (joinBlocks.Peek().blockNum > joinBlock.blockNum) {
                                 BasicBlock tmp = joinBlocks.Pop();
 
@@ -726,7 +731,6 @@ namespace ScannerParser {
             VerifyToken(Token.WHILE, "Got to while statement without seeing the while keyword");
             Next(); // eat while
 
-            scopes.Pop();
 
             // Create the header block for this loop
             BasicBlock loopHeaderBlock = new BasicBlock(nextBBid++);
@@ -740,8 +744,7 @@ namespace ScannerParser {
             curBasicBlock.childBlocks.Add(loopHeaderBlock);
             curBasicBlock = loopHeaderBlock;
             instructionManager.setCurrentBlock(curBasicBlock);
-            curBasicBlock.scopeNumber = nextScopeNumber;
-            scopes.Push(nextScopeNumber++);
+            curBasicBlock.scopeNumber = scopes.Peek();
             loopHeaderBlocks.Push(curBasicBlock);
             globalNestingLevel++;
 
@@ -750,7 +753,6 @@ namespace ScannerParser {
 
             // Pop the header off the scope stack as the only code that will be added to it is the
             // unconditional branch and that doesn't depend on scope
-            scopes.Pop();
 
             VerifyToken(Token.DO, "No do keyword after the relation in while statement");
             Next(); // eat do
@@ -775,12 +777,10 @@ namespace ScannerParser {
                 curBasicBlock.childBlocks.Add(loopBodyBlock);
                 curBasicBlock = loopBodyBlock;
                 instructionManager.setCurrentBlock(curBasicBlock);
-                curBasicBlock.scopeNumber = nextScopeNumber;
-                scopes.Push(nextScopeNumber++);
+                curBasicBlock.scopeNumber = scopes.Peek();
 
                 StatSequence();
 
-                scopes.Pop();
 
 
                 // todo, here we will need a branch to loop header
@@ -810,8 +810,7 @@ namespace ScannerParser {
                 correspondingHeaderBlock.childBlocks.Add(loopFollowBlock);
                 curBasicBlock = loopFollowBlock;
                 instructionManager.setCurrentBlock(curBasicBlock);
-                curBasicBlock.scopeNumber = nextScopeNumber;
-                scopes.Push(nextScopeNumber++);
+                curBasicBlock.scopeNumber = scopes.Peek();
 
                 // Link the branch at the end of the header to the follow block
                 Instruction branchToInstruction = correspondingHeaderBlock.firstInstruction;
@@ -1244,6 +1243,32 @@ namespace ScannerParser {
                     FuncDecl();
                 }
 
+                entryBlock = new BasicBlock(0);
+                entryBlock.blockLabel = "ENTRY";
+                flowGraphNodes[entryBlock.blockNum] = entryBlock;
+                entryBlock.childBlocks = new List<BasicBlock>();
+                entryBlock.parentBlocks = new List<BasicBlock>();
+                entryBlock.blockType = BasicBlock.BlockType.ENTRY;
+
+                exitBlock = new BasicBlock(0);
+                exitBlock.blockLabel = "EXIT";
+                flowGraphNodes[entryBlock.blockNum] = exitBlock;
+                exitBlock.childBlocks = new List<BasicBlock>();
+                exitBlock.parentBlocks = new List<BasicBlock>();
+                exitBlock.blockType = BasicBlock.BlockType.EXIT;
+                entryBlock.childBlocks.Add(exitBlock);
+
+                rootBasicBlock = new BasicBlock(nextBBid++);
+                rootBasicBlock.blockLabel = "MAIN:";
+                flowGraphNodes[rootBasicBlock.blockNum] = rootBasicBlock;
+                rootBasicBlock.childBlocks = new List<BasicBlock>();
+                rootBasicBlock.parentBlocks = new List<BasicBlock>();
+                rootBasicBlock.nestingLevel = globalNestingLevel;
+                rootBasicBlock.blockType = BasicBlock.BlockType.MAIN_ENTRY;
+                entryBlock.childBlocks.Add(rootBasicBlock);
+                curBasicBlock = rootBasicBlock;
+                instructionManager.setCurrentBlock(curBasicBlock);
+
                 // start program
                 SSAWriter.sw.WriteLine("MAIN: ");
                 Console.WriteLine("MAIN: ");
@@ -1280,15 +1305,14 @@ namespace ScannerParser {
 
             VerifyToken(Token.IDENT, "Function/Procedure declaration missing a name");
 
-            //BasicBlock functionStart = new BasicBlock(nextBBid++);
-            //flowGraphNodes[functionStart.blockNum] = functionStart;
-            //functionStart.childBlocks = new List<BasicBlock>();
-            //functionStart.parentBlocks = new List<BasicBlock>();
-            //functionStart.nestingLevel = globalNestingLevel;
-            //functionStart.blockType = BasicBlock.BlockType.FUNCTION_HEADER;
-            //curBasicBlock = functionStart;
-            //instructionManager.setCurrentBlock(functionStart);
-            //curBasicBlock.scopeNumber = nextScopeNumber;
+            BasicBlock functionStart = new BasicBlock(nextBBid++);
+            flowGraphNodes[functionStart.blockNum] = functionStart;
+            functionStart.childBlocks = new List<BasicBlock>();
+            functionStart.parentBlocks = new List<BasicBlock>();
+            functionStart.nestingLevel = globalNestingLevel;
+            functionStart.blockType = BasicBlock.BlockType.FUNCTION_HEADER;
+            curBasicBlock = functionStart;
+            instructionManager.setCurrentBlock(functionStart);
 
             FunctionSymbol function;
             if (scopes.Peek() == 1) { // function is in global scope as well as local scope
@@ -1302,7 +1326,8 @@ namespace ScannerParser {
                 function = new FunctionSymbol(funcType, scanner.id, AssemblyPC, scopes.Peek());
             }
             AddToSymbolTable(function, scopes.Peek());
-            //functionStart.blockLabel = scanner.Id2String(function.identID);
+            functionStart.blockLabel = scanner.Id2String(function.identID);
+            curBasicBlock.scopeNumber = scopes.Peek();
 
             SSAWriter.sw.WriteLine("{0}:", scanner.Id2String(function.identID).ToUpper());
             Console.WriteLine("{0}:", scanner.Id2String(function.identID).ToUpper());

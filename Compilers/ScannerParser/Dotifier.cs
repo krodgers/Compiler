@@ -24,12 +24,16 @@ namespace ScannerParser {
             dotOut.AppendLine("entry [shape=Msquare];");
             dotOut.AppendLine("exit [shape=Msquare];");
 
-            dotOut.AppendLine(String.Format("{0} -> {1}", "entry", 1));
 
             foreach (KeyValuePair<int, BasicBlock> entry in flowGraphNodes) {
                 // do something with entry.Value or entry.Key
                 var block = entry.Value;
                 var key = entry.Key;
+
+                if (entry.Value.blockType == BasicBlock.BlockType.MAIN_ENTRY)
+                {
+                    dotOut.AppendLine(String.Format("{0} -> {1}", "entry", entry.Value.blockNum));
+                }
 
                 if (block.blockType != BasicBlock.BlockType.ENTRY && 
                     block.blockType != BasicBlock.BlockType.EXIT)
@@ -54,12 +58,14 @@ namespace ScannerParser {
             dotOut.AppendLine("digraph flow_graph {");
             dotOut.AppendLine("entry [shape=Msquare];");
 
-            dotOut.AppendLine(String.Format("{0} -> {1}", 1, "entry"));
-
             foreach (KeyValuePair<int, BasicBlock> entry in flowGraphNodes) {
                 // do something with entry.Value or entry.Key
                 var block = entry.Value;
                 var key = entry.Key;
+
+                if (entry.Value.blockType == BasicBlock.BlockType.MAIN_ENTRY) {
+                    dotOut.AppendLine(String.Format("{0} -> {1}", "entry", entry.Value.blockNum));
+                }
 
                 if (block.blockType != BasicBlock.BlockType.ENTRY &&
                     block.blockType != BasicBlock.BlockType.EXIT) {
