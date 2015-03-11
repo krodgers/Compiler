@@ -517,7 +517,8 @@ namespace ScannerParser {
                         {
                             curBasicBlock.childBlocks.Add(joinBlock);
                             // Insert the branch that will get us back to the header at the end of the loop
-                            instructionManager.PutUnconditionalBranch(Token.BRANCH, joinBlock.blockNum, AssemblyPC++);
+                            instructionManager.PutUnconditionalBranch(Token.BRANCH, joinBlock.blockNum, AssemblyPC);
+                            SSAWriter.PutUnconditionalBranch(Utilities.TokenToInstruction(Token.BRANCH), joinBlock.blockNum.ToString(), AssemblyPC++);
 
                         }
                         
@@ -563,7 +564,8 @@ namespace ScannerParser {
                             if (curBasicBlock.blockType == BasicBlock.BlockType.FOLLOW) {
                                 curBasicBlock.childBlocks.Add(joinBlock);
                                 // Insert the branch that will get us back to the header at the end of the loop
-                                instructionManager.PutUnconditionalBranch(Token.BRANCH, joinBlock.blockNum, AssemblyPC++);
+                                instructionManager.PutUnconditionalBranch(Token.BRANCH, joinBlock.blockNum, AssemblyPC);
+                                SSAWriter.PutUnconditionalBranch(Utilities.TokenToInstruction(Token.BRANCH), joinBlock.blockNum.ToString(), AssemblyPC++);
 
                             }
                             
@@ -602,7 +604,8 @@ namespace ScannerParser {
                                     instructionManager.setCurrentBlock(trueBlock);
 
                                     // Insert the branch that will get us back to the header at the end of the loop
-                                    instructionManager.PutUnconditionalBranch(Token.BRANCH, joinBlock.blockNum, AssemblyPC++);
+                                    instructionManager.PutUnconditionalBranch(Token.BRANCH, joinBlock.blockNum, AssemblyPC);
+                                    SSAWriter.PutUnconditionalBranch(Utilities.TokenToInstruction(Token.BRANCH), joinBlock.blockNum.ToString(), AssemblyPC++);
 
                                     // Switch the instruction manager back to the current block
                                     instructionManager.setCurrentBlock(curBasicBlock);
@@ -633,7 +636,8 @@ namespace ScannerParser {
                                     instructionManager.setCurrentBlock(trueBlock);
 
                                     // Insert the branch that will get us back to the header at the end of the loop
-                                    instructionManager.PutUnconditionalBranch(Token.BRANCH, joinBlock.blockNum, AssemblyPC++);
+                                    instructionManager.PutUnconditionalBranch(Token.BRANCH, joinBlock.blockNum, AssemblyPC);
+                                    SSAWriter.PutUnconditionalBranch(Utilities.TokenToInstruction(Token.BRANCH), joinBlock.blockNum.ToString(), AssemblyPC++);
 
                                     // Switch the instruction manager back to the current block
                                     instructionManager.setCurrentBlock(curBasicBlock);
@@ -656,7 +660,8 @@ namespace ScannerParser {
                                     instructionManager.setCurrentBlock(falseBlock);
 
                                     // Insert the branch that will get us back to the header at the end of the loop
-                                    instructionManager.PutUnconditionalBranch(Token.BRANCH, joinBlock.blockNum, AssemblyPC++);
+                                    instructionManager.PutUnconditionalBranch(Token.BRANCH, joinBlock.blockNum, AssemblyPC);
+                                    SSAWriter.PutUnconditionalBranch(Utilities.TokenToInstruction(Token.BRANCH), joinBlock.blockNum.ToString(), AssemblyPC++);
 
                                     // Switch the instruction manager back to the current block
                                     instructionManager.setCurrentBlock(curBasicBlock);
@@ -686,7 +691,8 @@ namespace ScannerParser {
 
                                     // Insert the branch that will get us back to the header at the end of the loop
                                     instructionManager.PutUnconditionalBranch(Token.BRANCH, joinBlock.blockNum,
-                                        AssemblyPC++);
+                                        AssemblyPC);
+                                    SSAWriter.PutUnconditionalBranch(Utilities.TokenToInstruction(Token.BRANCH), joinBlock.blockNum.ToString(), AssemblyPC++);
 
                                     // Switch the instruction manager back to the current block
                                     instructionManager.setCurrentBlock(curBasicBlock);
@@ -787,7 +793,8 @@ namespace ScannerParser {
                 curBasicBlock.childBlocks.Add(correspondingHeaderBlock);
 
                 // Insert the branch that will get us back to the header at the end of the loop
-                instructionManager.PutUnconditionalBranch(Token.BRANCH, correspondingHeaderBlock.blockNum, AssemblyPC++);
+                instructionManager.PutUnconditionalBranch(Token.BRANCH, correspondingHeaderBlock.blockNum, AssemblyPC);
+                SSAWriter.PutUnconditionalBranch(Utilities.TokenToInstruction(Token.BRANCH), correspondingHeaderBlock.blockNum.ToString(), AssemblyPC++);
 
 
                 // Create the follow block, link the header to it, and set the current block to it. Also fix up the link in the branch
