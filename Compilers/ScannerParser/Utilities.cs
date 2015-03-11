@@ -134,5 +134,48 @@ namespace ScannerParser {
             }
         }
 
-    }
+
+        public static string TokenToBranchInstruction(Token opCode) {
+            switch (opCode) {
+                case Token.EQL:
+                    return "beq";
+                case Token.NEQ:
+                    return "bne";
+                case Token.LSS:
+                    return "blt";
+                case Token.GTR:
+                    return "bgt";
+                case Token.LEQ:
+                    return "ble";
+                case Token.GEQ:
+                    return "bge";
+                default:
+                    return String.Empty;
+            }
+        }
+
+        public static OpCodeClass GetOpCodeClass(Token opCode, bool immediate = false) {
+            switch (opCode) {
+                case Token.TIMES:
+                case Token.DIV:
+                case Token.PLUS:
+                case Token.MINUS:
+                    if (immediate)
+                        return OpCodeClass.ARITHMETIC_IMM;
+                    else
+                        return OpCodeClass.ARITHMETIC_REG;
+                case Token.EQL:
+                case Token.NEQ:
+                case Token.LSS:
+                case Token.GTR:
+                case Token.LEQ:
+                case Token.GEQ:
+                    return OpCodeClass.COMPARE;
+                case Token.BECOMES:
+                    return OpCodeClass.MEM_ACCESS;
+                default:
+                    return OpCodeClass.ERROR;
+            }
+        }
+   }
 }

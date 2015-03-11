@@ -5,13 +5,13 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace ScannerParser {
-    class FunctionArgumentSymbol : Symbol{
+    class MemoryBasedSymbol : Symbol{
 
 
         public int functionOffset { private set; get; } // offset from 
 
         // Constructor 
-        public FunctionArgumentSymbol(Token whatAmI, int ID, int lineNum, int scope, int offset)
+        public MemoryBasedSymbol(Token whatAmI, int ID, int lineNum, int scope, int offset)
             : base(whatAmI, ID, lineNum, scope) {
                 if (offset < 0)
                     functionOffset = -offset;

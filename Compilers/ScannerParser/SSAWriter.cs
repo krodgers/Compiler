@@ -64,15 +64,19 @@ namespace ScannerParser {
         }
 
         // gets argument from stack
-        // Need to increment Assembly line by 3
+        // Need to increment Assembly line by 2
         public static Result LoadFunctionArgument(int argumentOffset, Result arg, int lineNumber) {
-            //sw.WriteLine("{0}: sub #{1} $FP", lineNumber, Math.Abs(argumentOffset));
-            //Console.WriteLine("{0}: sub #{1} $FP", lineNumber, Math.Abs(argumentOffset));
-            //sw.WriteLine("{0}: move ({1}) {2}", lineNumber + 1, lineNumber, arg.GetValue());
-            //Console.WriteLine("{0}: move ({1}) {2}", lineNumber + 1, lineNumber, arg.GetValue());
-
-            //            LoadVariable(new Result(Kind.REG, String.Format("({0})", lineNumber )), lineNumber);
-            LoadVariable(arg, lineNumber);
+            sw.WriteLine("{0}: sub #{1} $FP", lineNumber, Math.Abs(argumentOffset));
+            Console.WriteLine("{0}: sub #{1} $FP", lineNumber, Math.Abs(argumentOffset));
+        //    sw.WriteLine("{0}: move ({1}) {2}", lineNumber + 1, lineNumber, arg.GetValue());
+          //  Console.WriteLine("{0}: move ({1}) {2}", lineNumber + 1, lineNumber, arg.GetValue());
+            lineNumber++;
+            sw.WriteLine("{1}: load {0}", arg.GetValue(), lineNumber);
+            Console.WriteLine("{1}: load {0}", arg.GetValue(), lineNumber);
+            
+          
+          //  LoadVariable(new Result(Kind.REG, String.Format("({0})", lineNumber)), lineNumber);
+            //LoadVariable(arg, lineNumber);
             return new Result(Kind.REG, String.Format("({0})", lineNumber));
         }
 
@@ -113,16 +117,21 @@ namespace ScannerParser {
         // Memory Instructions
         //////////////////////////////////////////////
         // Loads Variable from Memory
-        public static Result LoadVariable(Result thingToLoad, int lineNumber) {
+        // offset - relative to FP
+        public static Result LoadVariable(Result thingToLoad, int offset,  int lineNumber) {
+            sw.WriteLine("{0}: sub #{1} $FP", lineNumber, Math.Abs(offset));
+            Console.WriteLine("{0}: sub #{1} $FP", lineNumber, Math.Abs(offset));
+            lineNumber++;
             sw.WriteLine("{1}: load {0}", thingToLoad.GetValue(), lineNumber);
             Console.WriteLine("{1}: load {0}", thingToLoad.GetValue(), lineNumber);
+         
             Result res;
-            if (thingToLoad.type == Kind.REG) {
-                res = new Result(Kind.REG, thingToLoad.GetValue());
+            //if (thingToLoad.type == Kind.REG) {
+            //    res = new Result(Kind.REG, thingToLoad.GetValue());
 
-            } else {
+            //} else {
                 res = new Result(Kind.REG, String.Format("({0})", lineNumber));
-            }
+            //}
 
             return res;
         }
@@ -244,6 +253,8 @@ namespace ScannerParser {
                 currInstr = currInstr.next;
             }
         }
+
+        // TODO:: This function is broken.. Needs to be fixed if we want to use it.
         // Writes out the the instructions in an if/while block
         // Adds the branching instruction's address to the instruction
         //##:b__ # branchAddress

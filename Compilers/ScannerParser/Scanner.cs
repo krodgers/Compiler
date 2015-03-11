@@ -63,7 +63,8 @@ namespace ScannerParser
          
             Token res = Token.ERROR;
             char currChar = (char)inputSym;
-            Token currToken;
+            Token 
+                currToken;
             try
             {
                 switch (currChar)
@@ -284,7 +285,7 @@ namespace ScannerParser
             inputSym = ERROR_CHAR;
 
             Console.Write(errMsg);
-            Console.ReadLine();
+         //   Console.ReadLine();
             System.Environment.Exit(0);
             
         }

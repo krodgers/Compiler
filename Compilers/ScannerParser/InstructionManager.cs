@@ -160,7 +160,8 @@ namespace ScannerParser {
             InsertAndLink(tmp);
         }
 
-        // a branch instruction
+        // branches to branchlocation unconditionally
+        // i.e. branch TRUE
         public void PutUnconditionalBranch(Token opCode, int branchLocation, int lineNumber)
         {
             Instruction tmp = new Instruction(lineNumber, curBasicBlock);
@@ -175,8 +176,15 @@ namespace ScannerParser {
             // Initialize all of the pointer fields for the instruction
             InsertAndLink(tmp);
         }
+        // cmp A B
+        public void PutCompare(Token opCode, Result operandA, Result operandB,int lineNumber ) {
+            PutBasicInstruction(opCode, operandA, operandB, lineNumber);
 
-        // a compare instruction
+        }
+
+        // Branch on condition
+        // condResult -- the compare result this branch is dependent on
+        // tempLabel -- the place to branch to ---- complete unused
         public void PutConditionalBranch(Token opCode, Result condResult, string tempLabel, int lineNumber)
         {
             Instruction tmp = new Instruction(lineNumber, curBasicBlock);

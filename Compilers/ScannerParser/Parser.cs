@@ -45,8 +45,8 @@ namespace ScannerParser {
 
         private Stack<int> scopes; // track the current scope
         private int nextScopeNumber; // next assignable scope number
-        //   private Dictionary<Symbol, List<Symbol>> symbolTable; // indexed by function
         private List<Symbol> symbolTable; // all the symbols! // indexed by symbol id
+        private int nextGlobalOffset;
 
         private Stack<BasicBlock> joinBlocks;
         private Stack<BasicBlock> loopHeaderBlocks;
@@ -72,6 +72,7 @@ namespace ScannerParser {
             scopes = new Stack<int>();
             symbolTable = new List<Symbol>();
             nextScopeNumber = 2;
+            nextGlobalOffset = 0;
 
             joinBlocks = new Stack<BasicBlock>();
             loopHeaderBlocks = new Stack<BasicBlock>();
@@ -228,11 +229,13 @@ namespace ScannerParser {
                 }
                 else {
                     // todo, evaluate when this happens
-                    if (res.type == Kind.VAR || res.type == Kind.REG)
-                    {
+                    Console.WriteLine("It happened");
+                    if (res.type == Kind.VAR || res.type == Kind.REG) {
+
                         oldAssemblyPC = AssemblyPC;
-                    	instructionManager.PutLoadInstruction(res, AssemblyPC);
-                        res = SSAWriter.LoadVariable(res, AssemblyPC);
+                    	//instructionManager.PutLoadInstruction(res, AssemblyPC);
+                        //  res = SSAWriter.LoadVariable(res, AssemblyPC);
+                        res = LoadIfNeeded(res);
                         AssemblyPC++;
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         
@@ -743,6 +746,7 @@ namespace ScannerParser {
                 // Insert the branch that will get us back to the header at the end of the loop
                 instructionManager.PutUnconditionalBranch(Token.BRANCH, correspondingHeaderBlock.blockNum, AssemblyPC++);
 
+
                 // Create the follow block, link the header to it, and set the current block to it. Also fix up the link in the branch
                 // of the header now that we know the line number of the first instruction of the follow block
                 BasicBlock loopFollowBlock = new BasicBlock(nextBBid++);
@@ -865,7 +869,7 @@ namespace ScannerParser {
 
 
             if (newA.type == Kind.VAR && newB.type == Kind.VAR) {
-                switch (GetOpCodeClass(opCode)) {
+                switch (Utilities.GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
@@ -891,7 +895,7 @@ namespace ScannerParser {
                 //PutF2(Utilities.TokenToInstruction(opCode), loadednewA loadedB);
             }
             else if (newA.type == Kind.VAR && newB.type == Kind.CONST) {
-                switch (GetOpCodeClass(opCode, true)) {
+                switch (Utilities.GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
@@ -918,7 +922,7 @@ namespace ScannerParser {
 
             }
             else if (newA.type == Kind.REG && newB.type == Kind.CONST) {
-                switch (GetOpCodeClass(opCode, true)) {
+                switch (Utilities.GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
@@ -947,7 +951,7 @@ namespace ScannerParser {
             else if (newA.type == Kind.VAR && newB.type == Kind.REG) {
                 // todo, fill in later because reg is weird right now
 
-                switch (GetOpCodeClass(opCode)) {
+                switch (Utilities.GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
@@ -975,7 +979,7 @@ namespace ScannerParser {
             }
             else if (newB.type == Kind.REG && newA.type == Kind.REG) {
 
-                switch (GetOpCodeClass(opCode)) {
+                switch (Utilities.GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
@@ -1002,7 +1006,7 @@ namespace ScannerParser {
             }
             else if (newB.type == Kind.VAR && newA.type == Kind.CONST) {
 
-                switch (GetOpCodeClass(opCode, true)) {
+                switch (Utilities.GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
@@ -1030,7 +1034,7 @@ namespace ScannerParser {
             }
             else if (newB.type == Kind.VAR && newA.type == Kind.REG) {
 
-                switch (GetOpCodeClass(opCode)) {
+                switch (Utilities.GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
@@ -1057,7 +1061,7 @@ namespace ScannerParser {
 
             }
             else if (newB.type == Kind.REG && newA.type == Kind.CONST) {
-                switch (GetOpCodeClass(opCode, true)) {
+                switch (Utilities.GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
@@ -1117,26 +1121,30 @@ namespace ScannerParser {
                 int variID = scanner.String2Id(variableToLoad.GetValue());
                 Symbol curSymbol = symbolTable[variID];
 
-                if (curSymbol.GetType() == typeof(FunctionArgumentSymbol) && curSymbol.IsInScope(scopes.Peek())) {
-                    FunctionArgumentSymbol argSym = (FunctionArgumentSymbol)curSymbol;
+                if (curSymbol.GetType() == typeof(MemoryBasedSymbol) && (curSymbol.IsInScope(scopes.Peek()) || curSymbol.IsGlobal())) {
+                    MemoryBasedSymbol argSym = (MemoryBasedSymbol)curSymbol;
                     int offset = argSym.GetFunctionArgumentOffset();
                     oldAssemblyPC = AssemblyPC;
-                    instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
                     res = SSAWriter.LoadFunctionArgument(offset, variableToLoad, AssemblyPC);
+                    instructionManager.PutBasicInstruction(Token.MINUS, new Result(Kind.CONST, argSym.functionOffset), new Result(Kind.REG, "$FP"), AssemblyPC);
+                    AssemblyPC++;
+                    instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
                     UpdateSymbol(curSymbol, res);
                     AssemblyPC += 1;
                     IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
 
                 }
                 else if (curSymbol.IsGlobal() && curSymbol.GetCurrentValue(scopes.Peek()) == null) {
+                    Console.WriteLine("WARNING:  Need to fix LoadIfNeeded");
 
-                    // Check if it's a global that hasn't been loaded yet
-                    oldAssemblyPC = AssemblyPC;
-                    instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
-                    res = SSAWriter.LoadVariable(variableToLoad, AssemblyPC);
-                    UpdateSymbol(curSymbol, res);
-                    AssemblyPC += 1;
-                    IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
+                    //// Check if it's a global that hasn't been loaded yet
+                    //oldAssemblyPC = AssemblyPC;
+                    //AssemblyPC++;
+                    //instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
+                    //res = SSAWriter.LoadVariable(variableToLoad, AssemblyPC);
+                    //UpdateSymbol(curSymbol, res);
+                    //AssemblyPC += 1;
+                    //IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
 
                 } else if (curSymbol.GetCurrentValue(scopes.Peek()) != null) {
                     // Check if the variable has a value already in the scope
@@ -1245,7 +1253,7 @@ namespace ScannerParser {
                 if (scannerSym == Token.IDENT) {
                     //                    Ident();
                     Next(); // eat ident
-                    Symbol sym = new FunctionArgumentSymbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek(), currentOffset);
+                    Symbol sym = new MemoryBasedSymbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek(), currentOffset);
                     currentOffset -= 4;
                     AddToSymbolTable(sym, scopes.Peek());
                     function.numberOfFormalParamters++;
@@ -1254,7 +1262,7 @@ namespace ScannerParser {
                         Next();
                         //                      Ident();
                         Next(); // eat Ident
-                        sym = new FunctionArgumentSymbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek(), currentOffset);
+                        sym = new MemoryBasedSymbol(Token.VAR, scanner.id, AssemblyPC, scopes.Peek(), currentOffset);
                         currentOffset -= 4;
                         AddToSymbolTable(sym, scopes.Peek());
                         function.numberOfFormalParamters++;
@@ -1450,12 +1458,16 @@ namespace ScannerParser {
         // Adds the symbol to the symbol table, if its ID is unique
         // else, adds the scope to the symbol
         private void AddToSymbolTable(Symbol s, int scope) {
-
             if (s.identID < symbolTable.Count && symbolTable[s.identID] != null) {
                 // already have a symbol with this name
                 symbolTable[s.identID].AddScope(scope);
-            }
-            else {
+            } else if (scope == 1 && s.GetType() != typeof(FunctionSymbol) && s.GetType() != typeof(MemoryBasedSymbol)) {
+                // see if symbol need to be assigned an offset
+                Console.WriteLine("{0} gets offset {1}", scanner.Id2String(s.identID), nextGlobalOffset);
+                MemoryBasedSymbol newSym = new MemoryBasedSymbol(s.type, s.identID, s.currLineNumber, scope, nextGlobalOffset);
+                symbolTable.Insert(s.identID, newSym);
+                nextGlobalOffset -= 4;
+            } else {
                 symbolTable.Insert(scanner.id, s);
             }
         }
@@ -1509,31 +1521,7 @@ namespace ScannerParser {
 
 
         }
-        private OpCodeClass GetOpCodeClass(Token opCode, bool immediate = false) {
-            switch (opCode) {
-                case Token.TIMES:
-                case Token.DIV:
-                case Token.PLUS:
-                case Token.MINUS:
-                    if (immediate)
-                        return OpCodeClass.ARITHMETIC_IMM;
-                    else
-                        return OpCodeClass.ARITHMETIC_REG;
-                case Token.EQL:
-                case Token.NEQ:
-                case Token.LSS:
-                case Token.GTR:
-                case Token.LEQ:
-                case Token.GEQ:
-                    return OpCodeClass.COMPARE;
-                case Token.BECOMES:
-                    return OpCodeClass.MEM_ACCESS;
-                default:
-                    return OpCodeClass.ERROR;
-            }
-        }
-
-
+       
         private void IncrementLoopCounters(int oldPC, int newPC)
         {
             int numInstructions = newPC - oldPC;

@@ -55,10 +55,11 @@ namespace ScannerParser {
             Console.WriteLine(msg);
             Write(msg);
             sw.Dispose();
-            Console.ReadLine();
+          //  Console.ReadLine();
             System.Environment.Exit(0);
         }
 
+        // symbolsAndOffsets -- the symbols relevant to the current block
         public void CodifyBlock(BasicBlock bb) {
             init(); 
             Instruction currInstr = bb.firstInstruction;
@@ -84,7 +85,21 @@ namespace ScannerParser {
                 case Token.TIMES:
                 case Token.DIV:
                 case Token.PLUS:
+                    HandleMathInstruction(opCode, currInstr);
+                    return 1;
                 case Token.MINUS:
+                    if (currInstr.secondOperand.Equals("$SP")) {
+                        // signals pushing
+                        currInstr = currInstr.next;
+                        HandleMemoryInstruction(currInstr.opCode, currInstr);
+                        return 2;
+
+                    } else if (currInstr.secondOperand.Equals("$FP")) {
+                        // needs to be loaded from memory
+                        HandleMemoryInstruction(opCode, currInstr);
+                        return 2;
+                    }
+
                     HandleMathInstruction(opCode, currInstr);
                     return 1;
                     
@@ -96,6 +111,8 @@ namespace ScannerParser {
                     return 1;
                     
                 // Function Instruction
+                // Branching Instruction
+                case Token.BRANCH:
                 case Token.CALL:
                 case Token.END:
                 case Token.RETURN:
@@ -103,10 +120,8 @@ namespace ScannerParser {
                 case Token.OUTPUTNUM:
                 case Token.OUTPUTNEWLINE:
                     HandleFunctionInstruction(opCode, currInstr);
-                    return -1; // HOW MANY??
+                    return 1; // HOW MANY??
                     
-                // Branching Instruction
-                case Token.BRANCH:
                 // Comparing Instruction
                 case Token.CHECK:
                 case Token.EQL:
@@ -115,14 +130,22 @@ namespace ScannerParser {
                 case Token.GEQ:
                 case Token.LEQ:
                 case Token.GTR:
-                    if (currInstr.secondOperandType == Instruction.OperandType.BRANCH) {
+                    // Is an unconditional branch
+                    if (currInstr.firstOperandType == Instruction.OperandType.BRANCH) {
+                        PutUnconditionalBranch(currInstr);
+                        return 1;
+
+                    } else if (currInstr.secondOperandType == Instruction.OperandType.BRANCH){
+                        // is a conditional branch
                         HandleBranchInstruction(opCode, currInstr);
                         return 1;
                     } else {
+                        // must be a compare instruction
                         HandleCompareInstruction(opCode, currInstr);
                         return 2; // eats cmp _ _ and bra _ _ 
+
                     }
-                    
+                    break;
                 default:
                     Error(String.Format("Unable to classify opcode {0}", opCode));
                     break;
@@ -215,7 +238,14 @@ namespace ScannerParser {
             // return to caller --> jump $ra
         }
 
-
+        // Stores $RA and branches to 4*c
+        private void BranchAndLink(int c) {
+            PutImmInstruction("bsr", c);
+        }
+        // Stores $RA and jumps to addr (absolute)
+        private void JumpAndLink(int addr) {
+            PutImmInstruction("jsr", addr);
+        }
 
 
         //////////////////////////////////////
@@ -247,10 +277,66 @@ namespace ScannerParser {
                    
                 }
 
-            } else {
+            } else if (opCode == Token.STORE) {
+                Push(currInstr);
+            } else if (opCode == Token.MINUS) {
+                // stack operation
+                if (!currInstr.secondOperand.Equals("$FP"))
+                    Error("Ended up in memory handler without FP as argument");
+                if (currInstr.firstOperandType != Instruction.OperandType.CONSTANT)
+                    Error("In memory -- need a constant for FP offset");
+
+                // firstOper == offset
+                int offset = Int32.Parse(currInstr.firstOperand);
+                currInstr = currInstr.next;
+
+                if (currInstr.opCode != Token.LOAD)
+                    Error("Load didn't follow modifying FP");
+
+                int ssaVal = symbols[currInstr.firstOperand];
+
+                if (ssaVal == -1)
+                    Error("Symbol uninitialized -- has no SSAVAl on record");
+
+                Load((int)GetRegister(ssaVal), (int)REG.FP, -offset, false);
+
+
+
             }
 
         }
+
+
+        private void Push(Instruction instr) {
+            // store thing place --- place is irrelevant (?)
+            REG restingPlace = GetAvailableReg();
+            if (instr.firstOperandType == Instruction.OperandType.CONSTANT) {
+                PutConstantInRegister(restingPlace, Int32.Parse(instr.firstOperand));
+                PutInstruction("psh", (int)restingPlace, (int)REG.SP, -4);
+            } else {
+                PutInstruction("psh", (int)GetRegister(instr.firstOperandSSAVal), (int)REG.SP, -4);
+            }
+            ReleaseRegister(restingPlace);
+        }
+        private void Pop(int whereToStore, int memLoc, int offset = -4) {
+            // pop A B C --- pop whereToPopTo MemLoc howMuchToDecreaseBy
+            PutInstruction("pop", whereToStore, memLoc, offset);
+        }
+        private void Store(int whatToStore, int memBase, int offset, bool offsetIsRegister) {
+            if (offsetIsRegister) {
+                PutInstruction("stx", whatToStore, memBase, offset);
+            } else {
+                PutInstruction("stw", whatToStore, memBase, offset);
+            }
+        }
+        private void Load(int whereToStore, int memBase, int offset, bool offsetIsRegister) {
+            if (offsetIsRegister) {
+                PutInstruction("ldx", whereToStore, memBase, offset);
+            } else {
+                PutInstruction("ldw", whereToStore, memBase, offset);
+            }
+        }
+
 
         //////////////////////////////////////////////
         // Branching/Comparing  Instructions	    //
@@ -271,9 +357,10 @@ namespace ScannerParser {
             }  
             int opA, opB;
             if (CheckImmediateAndReorder(currInstr, out opA, out opB)) {
-                PutImmInstruction(opCode, (int)GetRegister(opA), opB);
+                PutImmBranchInstruction(opCode, (int)GetRegister(opA), opB);
             } else {
-                Error("Branch instruction requires a constant");
+                // location assumed to be a string
+                PutBranchInstruction(opCode, (int)GetRegister(opA), currInstr.firstOperand);
             }
         }
 
@@ -287,8 +374,9 @@ namespace ScannerParser {
                 case Token.GEQ:
                 case Token.LEQ:
                 case Token.GTR:
+                    break;
                 default:
-                    Error("In compare but didn't get a compare opcode");
+                    Error(String.Format("In compare but didn't get a compare opcode: got {0}", opCode));
                     break;
             }
 
@@ -308,9 +396,10 @@ namespace ScannerParser {
             currInstr = currInstr.next;
             // branch result location
             if (CheckImmediateAndReorder(currInstr, out opA, out opB)) {
-                PutImmInstruction(opCode, (int)storage, opB);
+                PutImmBranchInstruction(opCode, (int)storage, opB);
             } else {
-                Error("Branch instruction requires a constant");
+                // assuming branch location is a string.....
+                PutBranchInstruction(opCode, (int)storage, currInstr.secondOperand);
             }
 
             // free the comparision registerx
@@ -318,8 +407,25 @@ namespace ScannerParser {
 
         }
 
+        private void PutUnconditionalBranch(Instruction instr) {
+            PutBranchInstruction(Token.EQL, 0, Int32.Parse(instr.firstOperand));
+        }
 
-      
+
+        private void PutBranchInstruction(Token opcode, int registerToCheck, int placeToBranch) {
+            sw.WriteLine(String.Format("{0} {1} {2}", Utilities.TokenToBranchInstruction(opcode), registerToCheck, placeToBranch));
+            Console.WriteLine(String.Format("{0} {1} #{2}", Utilities.TokenToBranchInstruction(opcode), (REG)registerToCheck, placeToBranch));
+        }
+
+        private void PutBranchInstruction(Token opcode, int registerToCheck, string placeToBranch) {
+            sw.WriteLine(String.Format("{0} {1} {2}", Utilities.TokenToBranchInstruction(opcode), registerToCheck, placeToBranch));
+            Console.WriteLine(String.Format("{0} {1} {2}", Utilities.TokenToBranchInstruction(opcode), (REG)registerToCheck, placeToBranch));
+        }
+        private void PutImmBranchInstruction(Token opcode, int registerToCheck, int placeToBranch) {
+            sw.WriteLine(String.Format("{0} {1} {2}", Utilities.TokenToBranchInstruction(opcode), registerToCheck, placeToBranch));
+            Console.WriteLine(String.Format("{0} {1} #{2}", Utilities.TokenToBranchInstruction(opcode), (REG)registerToCheck, placeToBranch));
+        }
+        
 
         ///////////////////////////////
         // Input/Output Instructions //
@@ -381,6 +487,11 @@ namespace ScannerParser {
             sw.WriteLine(String.Format("{0}i {1} {2} {3}", TokenToInstruction(opcode), A, B, C));
             Console.WriteLine(String.Format("{0}i {1} {2} #{3}", TokenToInstruction(opcode), (REG)A, (REG)B, C));
         }
+        private void PutInstruction(string opcode, int A, int B, int C) {
+            sw.WriteLine(String.Format("{0} {1} {2} {3}", opcode, A, B, C));
+            Console.WriteLine(String.Format("{0} {1} {2} {3}", opcode, (REG)A, (REG)B, (REG)C));
+
+        }
 
         private void PutInstruction(Token opcode, int A, int B) {
             sw.WriteLine(String.Format("{0} {1} {2}", TokenToInstruction(opcode), A, B));
@@ -392,14 +503,29 @@ namespace ScannerParser {
             Console.WriteLine(String.Format("{0} {1} #{2}", TokenToInstruction(opcode), (REG)A, B));
 
         }
+        private void PutInstruction(string opcode, int A, int B) {
+            sw.WriteLine(String.Format("{0} {1} {2}", opcode, A, B));
+            Console.WriteLine(String.Format("{0} {1} {2}", opcode, (REG)A, (REG)B));
+
+        }
         private void PutInstruction(Token opcode, int A) {
             sw.WriteLine(String.Format("{0} {1}", TokenToInstruction(opcode), A));
             Console.WriteLine(String.Format("{0} {1}", TokenToInstruction(opcode), (REG)A));
+
+        }
+        private void PutInstruction(string opcode, int A) {
+            sw.WriteLine(String.Format("{0} {1}", opcode, A));
+            Console.WriteLine(String.Format("{0} {1}", opcode, (REG)A));
         }
         private void PutImmInstruction(Token opcode, int A) {
             sw.WriteLine(String.Format("{0} {1}", TokenToInstruction(opcode), A));
             Console.WriteLine(String.Format("{0} #{1}", TokenToInstruction(opcode), A));
         }
+          private void PutImmInstruction(string opcode, int A) {
+            sw.WriteLine(String.Format("{0} {1}", opcode, A));
+            Console.WriteLine(String.Format("{0} #{1}", opcode, A));
+        }
+
         private void Write(string toWrite) {
             sw.WriteLine(toWrite);
             Console.WriteLine(toWrite);
@@ -500,8 +626,63 @@ namespace ScannerParser {
 
         // Returns the instruction associated with the token
         private string TokenToInstruction(Token t) {
-            return Parser.TokenToInstruction(t);
+            string opString = String.Empty;
+            switch (t) {
+                case Token.TIMES:
+                    opString = "mul";
+                    break;
+                case Token.DIV:
+                    opString = "div";
+                    break;
+                case Token.PLUS:
+                    opString = "add";
+                    break;
+                case Token.MINUS:
+                    opString = "sub";
+                    break;
+                case Token.CHECK:
+                    opString = "chk";
+                    break;    
+                case Token.EQL:
+                    opString =  "beq";
+                    break;
+                case Token.NEQ:
+                    opString =  "bne";
+                    break;
+                case Token.LSS:
+                    opString =  "blt";
+                    break;
+                case Token.GTR:
+                    opString =  "bgt";
+                    break;
+                case Token.LEQ:
+                    opString =  "ble";
+                    break;
+                case Token.GEQ:
+                    opString =  "bge";
+                    break;
+                case Token.OUTPUTNUM:
+                    opString = "wrd";
+                    break;
+                case Token.INPUTNUM:
+                    opString = "rdd";
+                    break;
+                case Token.OUTPUTNEWLINE:
+                    opString = "wrl";
+                    break;
+                case Token.END:
+                case Token.RETURN:
+                    opString = "ret";
+                    break;
+               
+                default:
+                    Error(String.Format("Unsupported token {0}", t));
+                    break;
+
+            }
+            return opString;
         }
+
 
         // Stores an argument at SP-4
         private void StoreFunctionArgument(Result Argument) {
