@@ -112,6 +112,11 @@ namespace ScannerParser {
             Console.WriteLine("{0}: {1} {2} {3}", lineNumber, opCode, condResult.GetValue(), label);
         }
 
+        public static void PutUnconditionalBranch(string opCode, string label, int lineNumber) {
+            sw.WriteLine("{0}: {1} {2} {3}", lineNumber, opCode, label);
+            Console.WriteLine("{0}: {1} {2} {3}", lineNumber, opCode, label);
+        }
+
 
         //////////////////////////////////////////////
         // Memory Instructions
