@@ -182,6 +182,14 @@ namespace ScannerParser {
 
         }
 
+        // Put a phi instruction
+        //public void PutPhiInstruction(int lineNumber, BasicBlock curJoin, int originalVarVal, int symTableId)
+        //{
+        //    PhiInstruction phi = new PhiInstruction(lineNumber, curJoin, originalVarVal);
+        //    phi.symTableID = symTableId;
+        //    phi.opCode = Token.PHI;
+        //}
+
         // Branch on condition
         // condResult -- the compare result this branch is dependent on
         // tempLabel -- the place to branch to ---- complete unused
@@ -332,10 +340,16 @@ namespace ScannerParser {
             }
 
             if (curInstruction.firstOperandType == Instruction.OperandType.SSA_VAL)
+            {
                 curInstruction.neededInstr[0] = instructionDictionary[curInstruction.firstOperandSSAVal];
+                instructionDictionary[curInstruction.firstOperandSSAVal].referencesToThisValue.Add(curInstruction);
+            }
 
             if (curInstruction.secondOperandType == Instruction.OperandType.SSA_VAL)
+            {
                 curInstruction.neededInstr[1] = instructionDictionary[curInstruction.secondOperandSSAVal];
+                instructionDictionary[curInstruction.secondOperandSSAVal].referencesToThisValue.Add(curInstruction);
+            }
         }
     }
 }

@@ -18,12 +18,13 @@ namespace ScannerParser {
         public int nestingLevel;
         public int scopeNumber;
         public BlockType blockType;
-
+        public Dictionary<string, PhiInstruction> phiInstructions;
 
         public BasicBlock(int myNumber) {
             blockNum = myNumber;
             joinPredecessorInstructionCount = 0;
             instructionCount = 0;
+            phiInstructions = new Dictionary<string, PhiInstruction>();
         }
 
 

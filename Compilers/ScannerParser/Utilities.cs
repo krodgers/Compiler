@@ -101,6 +101,9 @@ namespace ScannerParser {
                 case Token.OUTPUTNEWLINE:
                     opString = "wrl";
                     break;
+                case Token.PHI:
+                    opString = "phi";
+                    break;
                 case Token.END:
                 case Token.RETURN:
                     opString = "ret";
