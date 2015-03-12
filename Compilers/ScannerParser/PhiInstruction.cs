@@ -8,10 +8,12 @@ namespace ScannerParser {
     public class PhiInstruction : Instruction
     {
         public Result originalVarVal;
+        public string targetVar;
         public int symTableID { get; set; }
-        public PhiInstruction(int instructionNumber, BasicBlock myBB, Result originalVarVal) : base(instructionNumber, myBB)
+        public PhiInstruction(int instructionNumber, BasicBlock myBB, Result originalVarVal, string targetVar) : base(instructionNumber, myBB)
         {
             this.originalVarVal = originalVarVal;
+            this.targetVar = targetVar;
         }
 
         // Useful for checking whether this is a necessary phi
