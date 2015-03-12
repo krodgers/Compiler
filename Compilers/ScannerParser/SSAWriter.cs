@@ -70,9 +70,13 @@ namespace ScannerParser {
             Console.WriteLine("{0}: sub #{1} $FP", lineNumber, Math.Abs(argumentOffset));
         //    sw.WriteLine("{0}: move ({1}) {2}", lineNumber + 1, lineNumber, arg.GetValue());
           //  Console.WriteLine("{0}: move ({1}) {2}", lineNumber + 1, lineNumber, arg.GetValue());
+            //lineNumber++;
+            //sw.WriteLine("{1}: load {0}", arg.GetValue(), lineNumber);
+            //Console.WriteLine("{1}: load {0}", arg.GetValue(), lineNumber);
+            Result whereToLoadFrom = new Result(Kind.REG, String.Format("({0})",lineNumber));
             lineNumber++;
-            sw.WriteLine("{1}: load {0}", arg.GetValue(), lineNumber);
-            Console.WriteLine("{1}: load {0}", arg.GetValue(), lineNumber);
+            sw.WriteLine("{2}: load {0} {1} ", whereToLoadFrom.GetValue(), arg.GetValue(), lineNumber);
+            Console.WriteLine("{2}: load {0} {1}", whereToLoadFrom.GetValue(), arg.GetValue(), lineNumber);
             
           
           //  LoadVariable(new Result(Kind.REG, String.Format("({0})", lineNumber)), lineNumber);
@@ -126,9 +130,10 @@ namespace ScannerParser {
         public static Result LoadVariable(Result thingToLoad, int offset,  int lineNumber) {
             sw.WriteLine("{0}: sub #{1} $FP", lineNumber, Math.Abs(offset));
             Console.WriteLine("{0}: sub #{1} $FP", lineNumber, Math.Abs(offset));
+            Result whereToLoadFrom = new Result(Kind.REG, lineNumber);
             lineNumber++;
-            sw.WriteLine("{1}: load {0}", thingToLoad.GetValue(), lineNumber);
-            Console.WriteLine("{1}: load {0}", thingToLoad.GetValue(), lineNumber);
+            sw.WriteLine("{1}: load {0} {1} ", whereToLoadFrom, thingToLoad.GetValue(), lineNumber);
+            Console.WriteLine("{1}: load {0} {1}", whereToLoadFrom, thingToLoad.GetValue(), lineNumber);
          
             Result res;
             //if (thingToLoad.type == Kind.REG) {
@@ -140,6 +145,7 @@ namespace ScannerParser {
 
             return res;
         }
+
         // Stores Variable to Memory
         public static void Store(Result thingToStore, Result whereToStore, int lineNumber) {
             string storeValue = thingToStore.type == Kind.CONST ? "#" + thingToStore.GetValue() : thingToStore.GetValue();
@@ -256,22 +262,6 @@ namespace ScannerParser {
                 sw.WriteLine(currInstr.ToString());
                 Console.WriteLine(currInstr.ToString());
                 currInstr = currInstr.next;
-            }
-        }
-
-        // TODO:: This function is broken.. Needs to be fixed if we want to use it.
-        // Writes out the the instructions in an if/while block
-        // Adds the branching instruction's address to the instruction
-        //##:b__ # branchAddress
-        public static void WriteControlFlowBlock(BasicBlock block, String branchAddress) {
-            Instruction currInstr = block.firstInstruction;
-            while (currInstr != null) {
-                if (currInstr.myResult.type == Kind.BRA)
-                    Console.WriteLine(String.Format("{0} {1}", currInstr.ToString(), branchAddress));
-                else
-                    Console.WriteLine(currInstr.ToString());
-                currInstr = currInstr.next;
-
             }
         }
 

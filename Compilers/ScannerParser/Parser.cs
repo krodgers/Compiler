@@ -1196,6 +1196,7 @@ namespace ScannerParser {
                     case OpCodeClass.COMPARE:
                         // compare
                         oldAssemblyPC = AssemblyPC;
+//                        instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         res = SSAWriter.PutCompare("cmp", newA, newB, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
@@ -1231,7 +1232,7 @@ namespace ScannerParser {
                         Token newOP = Utilities.NegatedConditional(opCode);
                         string label = "FALSE_" + curBasicBlock.blockNum;
                         instructionManager.PutConditionalBranch(newOP, res, label, AssemblyPC);
-                        SSAWriter.PutConditionalBranch(Utilities.TokenToInstruction(newOP), res, label, AssemblyPC++);
+                        SSAWriter.PutConditionalBranch(Utilities.TokenToBranchInstruction(newOP), res, label, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                 }
@@ -1258,7 +1259,7 @@ namespace ScannerParser {
                         Token newOP = Utilities.NegatedConditional(opCode);
                         string label = "FALSE_" + curBasicBlock.blockNum;
                         instructionManager.PutConditionalBranch(newOP, res, label, AssemblyPC);
-                        SSAWriter.PutConditionalBranch(Utilities.TokenToInstruction(newOP), res, label, AssemblyPC++);
+                        SSAWriter.PutConditionalBranch(Utilities.TokenToBranchInstruction(opCode), res, label, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                 }
@@ -1287,7 +1288,7 @@ namespace ScannerParser {
                         Token newOP = Utilities.NegatedConditional(opCode);
                         string label = "FALSE_" + curBasicBlock.blockNum;
                         instructionManager.PutConditionalBranch(newOP, res, label, AssemblyPC);
-                        SSAWriter.PutConditionalBranch(Utilities.TokenToInstruction(newOP), res, label, AssemblyPC++);
+                        SSAWriter.PutConditionalBranch(Utilities.TokenToBranchInstruction(newOP), res, label, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                 }
@@ -1315,7 +1316,7 @@ namespace ScannerParser {
                         Token newOP = Utilities.NegatedConditional(opCode);
                         string label = "FALSE_" + curBasicBlock.blockNum;
                         instructionManager.PutConditionalBranch(newOP, res, label, AssemblyPC);
-                        SSAWriter.PutConditionalBranch(Utilities.TokenToInstruction(newOP), res, label, AssemblyPC++);
+                        SSAWriter.PutConditionalBranch(Utilities.TokenToBranchInstruction(newOP), res, label, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                 }
@@ -1342,7 +1343,7 @@ namespace ScannerParser {
                         Token newOP = Utilities.NegatedConditional(opCode);
                         string label = "FALSE_" + curBasicBlock.blockNum;
                         instructionManager.PutConditionalBranch(newOP, res, label, AssemblyPC);
-                        SSAWriter.PutConditionalBranch(Utilities.TokenToInstruction(newOP), res, label, AssemblyPC++);
+                        SSAWriter.PutConditionalBranch(Utilities.TokenToBranchInstruction(newOP), res, label, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                 }
@@ -1370,7 +1371,7 @@ namespace ScannerParser {
                         Token newOP = Utilities.NegatedConditional(opCode);
                         string label = "FALSE_" + curBasicBlock.blockNum;
                         instructionManager.PutConditionalBranch(newOP, res, label, AssemblyPC);
-                        SSAWriter.PutConditionalBranch(Utilities.TokenToInstruction(newOP), res, label, AssemblyPC++);
+                        SSAWriter.PutConditionalBranch(Utilities.TokenToBranchInstruction(newOP), res, label, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                 }
@@ -1397,7 +1398,7 @@ namespace ScannerParser {
                         Token newOP = Utilities.NegatedConditional(opCode);
                         string label = "FALSE_" + curBasicBlock.blockNum;
                         instructionManager.PutConditionalBranch(newOP, res, label, AssemblyPC);
-                        SSAWriter.PutConditionalBranch(Utilities.TokenToInstruction(newOP), res, label, AssemblyPC++);
+                        SSAWriter.PutConditionalBranch(Utilities.TokenToBranchInstruction(newOP), res, label, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                 }
@@ -1426,46 +1427,79 @@ namespace ScannerParser {
 
             return res;
         }
-
-        // TODO:: Update symbol table with variable's current values
-
+	// TODO:: Can't have function parameters and local variables with same name (?)
+        
         // Loads a variable from stack/memory if needed
         // Returns argument if doesn't need to be loaded
         private Result LoadIfNeeded(Result variableToLoad) {
             Result res = variableToLoad;
-            // Check if it's a function argument of this function
             if (variableToLoad.type == Kind.VAR) {
                 int variID = scanner.String2Id(variableToLoad.GetValue());
                 Symbol curSymbol = symbolTable[variID];
+                // Cases: Is a global and hasn't been initialized yet
+                //        Is a global and has been given a value
+                //        Is a function parameter and needs to be loaded
+                //        Is a function paramter that already has a value
+                //        Is a local function variable that has no value yet
+                //        Is a local function variable that has a value
 
-                if (curSymbol.GetType() == typeof(MemoryBasedSymbol) && (curSymbol.IsInScope(scopes.Peek()) || curSymbol.IsGlobal()) && curSymbol.GetCurrentValue(scopes.Peek()) == null ) {
-                    MemoryBasedSymbol argSym = (MemoryBasedSymbol)curSymbol;
-                    int offset = argSym.GetFunctionArgumentOffset();
-                    oldAssemblyPC = AssemblyPC;
-                    res = SSAWriter.LoadFunctionArgument(offset, variableToLoad, AssemblyPC);
-                    instructionManager.PutBasicInstruction(Token.MINUS, new Result(Kind.CONST, argSym.functionOffset), new Result(Kind.REG, "$FP"), AssemblyPC);
-                    AssemblyPC++;
-                    instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
-                    UpdateSymbol(curSymbol, res);
-                    AssemblyPC += 1;
-                    IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
-
-               // } else if (curSymbol.GetType() == typeof(MemoryBasedSymbol) && (curSymbol.IsInScope(scopes.Peek()) || curSymbol.IsGlobal()) && curSymbol.GetCurrentValue(scopes.Peek()) != null ) {
-                //    Console.WriteLine("WARNING:  Need to fix LoadIfNeeded");
-
-                //    //// Check if it's a global that hasn't been loaded yet
-                //    //oldAssemblyPC = AssemblyPC;
-                //    //AssemblyPC++;
-                //    //instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
-                //    //res = SSAWriter.LoadVariable(variableToLoad, AssemblyPC);
-                //    //UpdateSymbol(curSymbol, res);
-                //    //AssemblyPC += 1;
-                //    //IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
-
-                } else if (curSymbol.GetCurrentValue(scopes.Peek()) != null) {
+		// Case: Variable already has a value
+		if (curSymbol.GetCurrentValue(scopes.Peek()) != null) {
                     // Check if the variable has a value already in the scope
                     res = curSymbol.GetCurrentValue(scopes.Peek());
-                }
+		}  
+		    // Case: Local Function Variable
+		  else  if (curSymbol.GetType() != typeof(MemoryBasedSymbol) && curSymbol.IsInScope(scopes.Peek()) && curSymbol.GetCurrentValue(scopes.Peek()) == null) {
+			oldAssemblyPC = AssemblyPC;
+			// res = SSAWriter.LoadFunctionArgument(offset, variableToLoad, AssemblyPC);
+			//instructionManager.PutBasicInstruction(Token.MINUS, new Result(Kind.CONST, argSym.functionOffset), new Result(Kind.REG, "$FP"), AssemblyPC);
+			res = new Result(Kind.CONST, (double)0);
+                	instructionManager.PutBasicInstruction(Token.BECOMES, res, variableToLoad, AssemblyPC);
+			SSAWriter.PutInstruction("mov", res.GetValue(), variableToLoad.GetValue(), AssemblyPC);
+                    
+			AssemblyPC++;
+			//                    instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
+			UpdateSymbol(curSymbol, res);
+			//    AssemblyPC += 1;
+			IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
+		    }
+		// Case: Function Parameter
+		    else if (curSymbol.GetType() == typeof(MemoryBasedSymbol) && curSymbol.IsInScope(scopes.Peek()) && curSymbol.GetCurrentValue(scopes.Peek()) == null)  {
+			// load function values
+			MemoryBasedSymbol argSym = (MemoryBasedSymbol)curSymbol;
+			int offset = argSym.GetFunctionArgumentOffset();
+			oldAssemblyPC = AssemblyPC;
+			res = SSAWriter.LoadFunctionArgument(offset, variableToLoad, AssemblyPC);
+			instructionManager.PutBasicInstruction(Token.MINUS, new Result(Kind.CONST, argSym.functionOffset), new Result(Kind.REG, "$FP"), AssemblyPC);
+
+			AssemblyPC++;
+			instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
+			UpdateSymbol(curSymbol, res);
+			AssemblyPC += 1;
+			IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
+
+		    }
+		// Case: Global variable
+		    else  if (curSymbol.GetType() == typeof(MemoryBasedSymbol) && curSymbol.IsGlobal() && curSymbol.GetCurrentValue(scopes.Peek()) == null ) {
+			// Check for unintialized Globals
+			MemoryBasedSymbol argSym = (MemoryBasedSymbol)curSymbol;
+			int offset = argSym.GetFunctionArgumentOffset();
+			oldAssemblyPC = AssemblyPC;
+			// res = SSAWriter.LoadFunctionArgument(offset, variableToLoad, AssemblyPC);
+			//instructionManager.PutBasicInstruction(Token.MINUS, new Result(Kind.CONST, argSym.functionOffset), new Result(Kind.REG, "$FP"), AssemblyPC);
+			res = new Result(Kind.CONST, (double)0);
+                	instructionManager.PutBasicInstruction(Token.BECOMES, res, variableToLoad, AssemblyPC);
+			SSAWriter.PutInstruction("mov", res.GetValue(), variableToLoad.GetValue(), AssemblyPC);
+                    
+			AssemblyPC++;
+			//                    instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
+			UpdateSymbol(curSymbol, res);
+			//    AssemblyPC += 1;
+			IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
+                    
+		    } 
+		
+		
             } else if (variableToLoad.type == Kind.ARR) {
                 if (scannerSym == Token.OPENBRACKET)
                     res = MakeArrayReference(res, true);
@@ -1474,6 +1508,7 @@ namespace ScannerParser {
                 res = SSAWriter.LoadArrayElement(res, GetArrayDimensions(res.GetValue()), res.GetArrayIndices(), AssemblyPC);
                 AssemblyPC = res.lineNumber + 1;
             }
+		// 
 
             return res;
 
