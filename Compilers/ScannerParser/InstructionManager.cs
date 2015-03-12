@@ -23,7 +23,11 @@ namespace ScannerParser {
         public BasicBlock getCurrentBlock() {
             return curBasicBlock;
         }
-
+        public Instruction GetInstruction(int instructionNum){
+            Instruction result = null;
+            instructionDictionary.TryGetValue(instructionNum, out result);
+            return result;
+        }
 
         // NOTE:  Token.ARR means adda
         public void PutBasicInstruction(Token opCode, Result a, Result b, int lineNumber) {

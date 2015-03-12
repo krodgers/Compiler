@@ -191,8 +191,6 @@ namespace ScannerParser {
             }
             else if (scannerSym == Token.NUMBER) {
                 res = Number();
-               // res = new Result(Kind.CONST, Number().GetValue());
-            //    res = new Result(Kind.CONST, Double.Parse(Number().GetValue()));
             }
             else if (scannerSym == Token.CALL) {
                 // TODO:: where to put the result of a function call?
