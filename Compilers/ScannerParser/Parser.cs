@@ -52,6 +52,7 @@ namespace ScannerParser {
 
         private Stack<BasicBlock> joinBlocks;
         private Stack<BasicBlock> loopHeaderBlocks;
+        private StackList joinBlockListForPhis; 
         private int globalNestingLevel;
         BasicBlock trueBlock, falseBlock, joinBlock;
         Dictionary<int, BasicBlock> flowGraphNodes;
@@ -80,6 +81,7 @@ namespace ScannerParser {
 
             joinBlocks = new Stack<BasicBlock>();
             loopHeaderBlocks = new Stack<BasicBlock>();
+            joinBlockListForPhis = new StackList();
 
             instructionManager = new InstructionManager();
 
@@ -513,6 +515,7 @@ namespace ScannerParser {
                         joinBlock.dominatingBlock = curBasicBlock;
                         curBasicBlock.blocksIDominate.Add(joinBlock);
                         joinBlocks.Push(joinBlock);
+                        joinBlockListForPhis.Push(joinBlock);
 
                         curJoinBlock = joinBlock;
                         Debug.WriteLine("cur join: {0}", curJoinBlock.blockNum);
@@ -736,6 +739,7 @@ namespace ScannerParser {
                                 curBasicBlock.phiInstructions.Remove(key);
                             // End removing unnecessary phis //
 
+                            joinBlockListForPhis.Pop();
                             while (joinBlocks.Peek().blockNum > joinBlock.blockNum) {
                                 BasicBlock tmp = joinBlocks.Pop();
 
@@ -810,6 +814,7 @@ namespace ScannerParser {
             instructionManager.setCurrentBlock(curBasicBlock);
             curBasicBlock.scopeNumber = scopes.Peek();
             loopHeaderBlocks.Push(curBasicBlock);
+            joinBlockListForPhis.Push(curBasicBlock);
             globalNestingLevel++;
 
             Result res = Relation();
@@ -878,6 +883,7 @@ namespace ScannerParser {
                 curBasicBlock = loopFollowBlock;
                 instructionManager.setCurrentBlock(curBasicBlock);
                 curBasicBlock.scopeNumber = scopes.Peek();
+                joinBlockListForPhis.Pop();
 
                 Debug.WriteLine("At follow");
 
@@ -979,15 +985,18 @@ namespace ScannerParser {
 
                     switch (curBasicBlock.blockType) {
                         case BasicBlock.BlockType.TRUE:
+                            // todo, update true and false blocks to store the ssa val
                             if (!curJoinBlock.phiInstructions.ContainsKey(symbolName)) {
                                 // There is not currently a phi instruction for the variable
                                 // in the current join block, create it
-                                PhiInstruction phi = new PhiInstruction(AssemblyPC, curJoinBlock, res1);
+                                Result preTrueVal = new Result(Kind.REG, String.Format("{0}", oldVarVal));
+                                PhiInstruction phi = new PhiInstruction(AssemblyPC, curJoinBlock, preTrueVal);
                                 phi.symTableID = scanner.String2Id(symbolName);
                                 phi.opCode = Token.PHI;
 
                                 phi.firstOperand = symbolTable[phi.symTableID].currLineNumber.ToString();
                                 phi.firstOperandType = Instruction.OperandType.PHI_OPERAND;
+                                phi.firstOperandSSAVal = (int)Double.Parse(phi.firstOperand);
 
                                 // Link the phi instruction to the move that created this value
                                 Instruction tmp = curBasicBlock.firstInstruction;
@@ -995,6 +1004,15 @@ namespace ScannerParser {
                                     tmp = tmp.next;
                                 phi.neededInstr[0] = tmp;
                                 tmp.referencesToThisValue.Add(phi);
+
+                                // Second operand is the initial value
+                                phi.secondOperand = preTrueVal.GetValue();
+                                phi.secondOperandType = Instruction.OperandType.PHI_OPERAND;
+                                phi.secondOperandSSAVal = (int)Double.Parse(phi.firstOperand);
+
+                                // Link the phi instruction to the move that created this value and back
+                                phi.neededInstr[0] = instructionManager.instructionDictionary[phi.secondOperandSSAVal];
+                                instructionManager.instructionDictionary[phi.secondOperandSSAVal].referencesToThisValue.Add(phi);
 
                                 // Insert it at the front of the join block's instruction list
                                 if (curJoinBlock.firstInstruction != null)
@@ -1006,7 +1024,8 @@ namespace ScannerParser {
                                 curJoinBlock.phiInstructions[symbolName] = phi;
                                 curJoinBlock.instructionCount++;
 
-
+                                Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
+                                Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
                             }
                             else {
                                 // A phi instruction for this variable already exists, so we need to
@@ -1023,21 +1042,23 @@ namespace ScannerParser {
                                     phi.neededInstr[0].referencesToThisValue.Remove(phi);
                                 phi.neededInstr[0] = tmp;
                                 tmp.referencesToThisValue.Add(phi);
-                                
 
+                                Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
+                                Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
                             }
                             break;
                         case BasicBlock.BlockType.FALSE:
                             if (!curJoinBlock.phiInstructions.ContainsKey(symbolName)) {
                                 // There is not currently a phi instruction for the variable
                                 // in the current join block, create it
-
-                                PhiInstruction phi = new PhiInstruction(AssemblyPC, curJoinBlock, res1);
+                                Result preFalseVal = new Result(Kind.REG, String.Format("{0}", oldVarVal));
+                                PhiInstruction phi = new PhiInstruction(AssemblyPC, curJoinBlock, preFalseVal);
                                 phi.symTableID = scanner.String2Id(symbolName);
                                 phi.opCode = Token.PHI;
 
                                 phi.secondOperand = symbolTable[phi.symTableID].currLineNumber.ToString();
                                 phi.secondOperandType = Instruction.OperandType.PHI_OPERAND;
+                                phi.secondOperandSSAVal = (int) Double.Parse(phi.secondOperand);
 
                                 // Link the phi instruction to the move that created this value
                                 Instruction tmp = curBasicBlock.firstInstruction;
@@ -1055,6 +1076,8 @@ namespace ScannerParser {
                                 curJoinBlock.phiInstructions[symbolName] = phi;
                                 curJoinBlock.instructionCount++;
 
+                                Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
+                                Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
                             }
                             else {
                                 // A phi instruction for this variable already exists, so we need to
@@ -1071,32 +1094,37 @@ namespace ScannerParser {
                                     phi.neededInstr[1].referencesToThisValue.Remove(phi);
                                 phi.neededInstr[1] = tmp;
                                 tmp.referencesToThisValue.Add(phi);
+
+                                Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
+                                Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
                             }
                             break;
                         case BasicBlock.BlockType.LOOP_BODY:
                             if (!curJoinBlock.phiInstructions.ContainsKey(symbolName))
                             {
-                                PhiInstruction phi = new PhiInstruction(AssemblyPC, curJoinBlock, new Result(Kind.REG, String.Format("({0})", oldVarVal)));
+                                Result preHeaderVal = new Result(Kind.REG, String.Format("{0}", oldVarVal));
+                                PhiInstruction phi = new PhiInstruction(AssemblyPC, curJoinBlock, preHeaderVal);
                                 phi.symTableID = scanner.String2Id(symbolName);
                                 phi.opCode = Token.PHI;
 
-                                phi.firstOperand = res1.GetValue();
+                                phi.firstOperand = preHeaderVal.GetValue();
                                 phi.firstOperandType = Instruction.OperandType.PHI_OPERAND;
-                                //phi.firstOperandSSAVal = (int)Decimal.Parse(phi.firstOperand, NumberStyles.AllowParentheses) * -1;
+                                phi.firstOperandSSAVal = (int) Double.Parse(phi.firstOperand);
 
-                                // Link the phi instruction to the move that created this value
-                                //res1.
-                                //phi.neededInstr[0] = tmp;
-                                //tmp.referencesToThisValue.Add(phi);
+                                // Link the phi instruction to the move that created this value and back
+                                phi.neededInstr[0] = instructionManager.instructionDictionary[phi.firstOperandSSAVal];
+                                instructionManager.instructionDictionary[phi.firstOperandSSAVal].referencesToThisValue.Add(phi);
 
-                                phi.secondOperand = phi.secondOperand = symbolTable[phi.symTableID].currLineNumber.ToString();
+
+
+                                phi.secondOperand = symbolTable[phi.symTableID].currLineNumber.ToString();
+                                phi.secondOperandType = Instruction.OperandType.PHI_OPERAND;
+                                phi.secondOperandSSAVal = (int)Double.Parse(phi.secondOperand);
 
                                 // Link the phi instruction to the move that created this value
                                 Instruction tmp = curBasicBlock.firstInstruction;
                                 while (tmp.next != null)
                                     tmp = tmp.next;
-                                if (phi.neededInstr[1] != null)
-                                    phi.neededInstr[1].referencesToThisValue.Remove(phi);
                                 phi.neededInstr[1] = tmp;
                                 tmp.referencesToThisValue.Add(phi);
 
@@ -1110,11 +1138,16 @@ namespace ScannerParser {
                                 curJoinBlock.firstInstruction = phi;
                                 curJoinBlock.phiInstructions[symbolName] = phi;
                                 curJoinBlock.instructionCount++;
+
+                                Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
+                                Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
+
                             }
                             else
                             {
                                 PhiInstruction phi = curJoinBlock.phiInstructions[symbolName];
-                                phi.secondOperand = phi.secondOperand = symbolTable[phi.symTableID].currLineNumber.ToString();
+                                phi.secondOperand = symbolTable[phi.symTableID].currLineNumber.ToString();
+                                phi.secondOperandSSAVal = (int)Double.Parse(phi.secondOperand);
 
                                 // Link the phi instruction to the move that created this value
                                 Instruction tmp = curBasicBlock.firstInstruction;
@@ -1124,6 +1157,9 @@ namespace ScannerParser {
                                     phi.neededInstr[1].referencesToThisValue.Remove(phi);
                                 phi.neededInstr[1] = tmp;
                                 tmp.referencesToThisValue.Add(phi);
+
+                                Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
+                                Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
                             }
                             break;
                         case BasicBlock.BlockType.FOLLOW:

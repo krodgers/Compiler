@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace ScannerParser {
     public class InstructionManager {
-        private Dictionary<int, Instruction> instructionDictionary;
+        public Dictionary<int, Instruction> instructionDictionary;
         private BasicBlock curBasicBlock;
 
         public InstructionManager() {
