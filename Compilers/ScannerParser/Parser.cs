@@ -502,6 +502,7 @@ namespace ScannerParser {
                         joinBlock.parentBlocks = new List<BasicBlock>();
                         joinBlock.nestingLevel = globalNestingLevel;
                         joinBlock.dominatingBlock = curBasicBlock;
+                        curBasicBlock.blocksIDominate.Add(joinBlock);
                         joinBlocks.Push(joinBlock);
 
                         curJoinBlock = joinBlock;
@@ -525,6 +526,7 @@ namespace ScannerParser {
                         //trueBlock.childBlocks.Add(joinBlock);
                         trueBlock.nestingLevel = globalNestingLevel;
                         trueBlock.dominatingBlock = curBasicBlock;
+                        curBasicBlock.blocksIDominate.Add(trueBlock);
                         curBasicBlock.childBlocks.Add(trueBlock);
                         curBasicBlock = trueBlock;
                         instructionManager.setCurrentBlock(curBasicBlock);
@@ -567,6 +569,7 @@ namespace ScannerParser {
                             falseBlock.parentBlocks.Add(curBasicBlock);
                             falseBlock.nestingLevel = globalNestingLevel;
                             falseBlock.dominatingBlock = curBasicBlock;
+                            curBasicBlock.blocksIDominate.Add(falseBlock);
                             curBasicBlock.childBlocks.Add(falseBlock);
 
                             // Fix up the branch at the end of the if block so that
@@ -788,6 +791,7 @@ namespace ScannerParser {
             loopHeaderBlock.parentBlocks = new List<BasicBlock>();
             loopHeaderBlock.nestingLevel = globalNestingLevel;
             loopHeaderBlock.dominatingBlock = curBasicBlock;
+            curBasicBlock.blocksIDominate.Add(loopHeaderBlock);
             loopHeaderBlock.blockType = BasicBlock.BlockType.LOOP_HEADER;
             loopHeaderBlock.parentBlocks.Add(curBasicBlock);
             curBasicBlock.childBlocks.Add(loopHeaderBlock);
@@ -823,6 +827,7 @@ namespace ScannerParser {
                 loopBodyBlock.parentBlocks = new List<BasicBlock>();
                 loopBodyBlock.nestingLevel = globalNestingLevel;
                 loopBodyBlock.dominatingBlock = loopHeaderBlock;
+                loopHeaderBlock.blocksIDominate.Add(loopBodyBlock);
                 loopBodyBlock.blockType = BasicBlock.BlockType.LOOP_BODY;
                 loopBodyBlock.parentBlocks.Add(curBasicBlock);
                 curBasicBlock.childBlocks.Add(loopBodyBlock);
@@ -857,6 +862,7 @@ namespace ScannerParser {
                 loopFollowBlock.parentBlocks = new List<BasicBlock>();
                 loopFollowBlock.nestingLevel = globalNestingLevel;
                 loopFollowBlock.dominatingBlock = loopHeaderBlock;
+                loopHeaderBlock.blocksIDominate.Add(loopFollowBlock);
                 loopFollowBlock.blockType = BasicBlock.BlockType.FOLLOW;
                 loopFollowBlock.parentBlocks.Add(correspondingHeaderBlock);
                 correspondingHeaderBlock.childBlocks.Add(loopFollowBlock);
@@ -1067,7 +1073,7 @@ namespace ScannerParser {
 
                                 phi.firstOperand = res1.GetValue();
                                 phi.firstOperandType = Instruction.OperandType.PHI_OPERAND;
-                                phi.firstOperandSSAVal = (int)Decimal.Parse(phi.firstOperand, NumberStyles.AllowParentheses) * -1;
+                                //phi.firstOperandSSAVal = (int)Decimal.Parse(phi.firstOperand, NumberStyles.AllowParentheses) * -1;
 
                                 // Link the phi instruction to the move that created this value
                                 //res1.

@@ -13,6 +13,7 @@ namespace ScannerParser {
         public int instructionCount;
         public int joinPredecessorInstructionCount;
         public BasicBlock dominatingBlock; // 
+        public List<BasicBlock> blocksIDominate; 
         public List<BasicBlock> parentBlocks;
         public List<BasicBlock> childBlocks;  // block(s) with the instructions that follow this block's
         public int nestingLevel;
@@ -25,6 +26,7 @@ namespace ScannerParser {
             joinPredecessorInstructionCount = 0;
             instructionCount = 0;
             phiInstructions = new Dictionary<string, PhiInstruction>();
+            blocksIDominate = new List<BasicBlock>();
         }
 
 
