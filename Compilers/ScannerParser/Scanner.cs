@@ -285,7 +285,7 @@ namespace ScannerParser
             inputSym = ERROR_CHAR;
 
             Console.Write(errMsg);
-         //   Console.ReadLine();
+            Console.ReadLine();
             System.Environment.Exit(0);
             
         }

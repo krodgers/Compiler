@@ -188,8 +188,9 @@ namespace ScannerParser {
 
             }
             else if (scannerSym == Token.NUMBER) {
-                res = new Result(Kind.CONST, Number().GetValue());
-
+                res = Number();
+               // res = new Result(Kind.CONST, Number().GetValue());
+            //    res = new Result(Kind.CONST, Double.Parse(Number().GetValue()));
             }
             else if (scannerSym == Token.CALL) {
                 // TODO:: where to put the result of a function call?
@@ -316,8 +317,14 @@ namespace ScannerParser {
                                     Console.WriteLine("WARNING:{0}: Got Null argument in Function Argument ", AssemblyPC);
                                 }
                                 optionalArguments.Add(currArg);
-                                // TODO:: Need to store the function's offset somewhere -- done - in Symbol Class
+                               
+
                                 oldAssemblyPC = AssemblyPC;
+
+
+                                currArg = LoadIfNeeded(currArg); // get the latest value 
+
+
                                 instructionManager.PutFunctionArgument(currArg, AssemblyPC);
                                 SSAWriter.StoreFunctionArgument(currArg, AssemblyPC);
                                 // Set the value of the arguments
@@ -338,6 +345,10 @@ namespace ScannerParser {
                                     Result currArg = Expression();
                                     optionalArguments.Add(currArg);
                                     // TODO:: Need to store the function's offset somewhere, i.e which argument is it
+
+                                    currArg = LoadIfNeeded(currArg); // get the latest value 
+
+
                                     oldAssemblyPC = AssemblyPC;
                                     instructionManager.PutFunctionArgument(currArg, AssemblyPC);
                                     SSAWriter.StoreFunctionArgument(currArg, AssemblyPC);
@@ -1141,7 +1152,7 @@ namespace ScannerParser {
                 // This case causes issues with register allocation as it
                 // is possibly not needed for constants
               else if (newA.type == Kind.CONST && newB.type == Kind.CONST) {
-                res = new Result(Kind.CONST, "");
+                res = new Result(Kind.CONST, (double)0);
                 switch (opCode) {
                     case Token.TIMES:
                         res.SetValue(Double.Parse(newA.GetValue()) * Double.Parse(newB.GetValue()));
@@ -1172,7 +1183,7 @@ namespace ScannerParser {
                 int variID = scanner.String2Id(variableToLoad.GetValue());
                 Symbol curSymbol = symbolTable[variID];
 
-                if (curSymbol.GetType() == typeof(MemoryBasedSymbol) && (curSymbol.IsInScope(scopes.Peek()) || curSymbol.IsGlobal())) {
+                if (curSymbol.GetType() == typeof(MemoryBasedSymbol) && (curSymbol.IsInScope(scopes.Peek()) || curSymbol.IsGlobal()) && curSymbol.GetCurrentValue(scopes.Peek()) == null ) {
                     MemoryBasedSymbol argSym = (MemoryBasedSymbol)curSymbol;
                     int offset = argSym.GetFunctionArgumentOffset();
                     oldAssemblyPC = AssemblyPC;
@@ -1184,18 +1195,17 @@ namespace ScannerParser {
                     AssemblyPC += 1;
                     IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
 
-                }
-                else if (curSymbol.IsGlobal() && curSymbol.GetCurrentValue(scopes.Peek()) == null) {
-                    Console.WriteLine("WARNING:  Need to fix LoadIfNeeded");
+               // } else if (curSymbol.GetType() == typeof(MemoryBasedSymbol) && (curSymbol.IsInScope(scopes.Peek()) || curSymbol.IsGlobal()) && curSymbol.GetCurrentValue(scopes.Peek()) != null ) {
+                //    Console.WriteLine("WARNING:  Need to fix LoadIfNeeded");
 
-                    //// Check if it's a global that hasn't been loaded yet
-                    //oldAssemblyPC = AssemblyPC;
-                    //AssemblyPC++;
-                    //instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
-                    //res = SSAWriter.LoadVariable(variableToLoad, AssemblyPC);
-                    //UpdateSymbol(curSymbol, res);
-                    //AssemblyPC += 1;
-                    //IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
+                //    //// Check if it's a global that hasn't been loaded yet
+                //    //oldAssemblyPC = AssemblyPC;
+                //    //AssemblyPC++;
+                //    //instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
+                //    //res = SSAWriter.LoadVariable(variableToLoad, AssemblyPC);
+                //    //UpdateSymbol(curSymbol, res);
+                //    //AssemblyPC += 1;
+                //    //IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
 
                 } else if (curSymbol.GetCurrentValue(scopes.Peek()) != null) {
                     // Check if the variable has a value already in the scope
@@ -1293,7 +1303,7 @@ namespace ScannerParser {
             }
         }
 
-
+        // TODO:: Need to allocate space on stack for locals when we finally write out code for codifier
         private void FuncDecl() {
             Token funcType = scannerSym;
             if (scannerSym == Token.FUNC || scannerSym == Token.PROC) {

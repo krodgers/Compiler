@@ -10,7 +10,7 @@ namespace ScannerParser {
     class FunctionSymbol : Symbol {
 
         public int numberOfFormalParamters { set; get; } // number of arguments it takes
-
+        public int sizeOfLocals { set; get; } // amount of space needed on the stack
 
           // Constructor 
         public FunctionSymbol(Token whatAmI, int ID, int lineNum, int scope) 

@@ -55,7 +55,7 @@ namespace ScannerParser {
             Console.WriteLine(msg);
             Write(msg);
             sw.Dispose();
-          //  Console.ReadLine();
+            Console.ReadLine();
             System.Environment.Exit(0);
         }
 
@@ -229,6 +229,8 @@ namespace ScannerParser {
 
         // Generates the code that should happen upon exiting a function
         private void FunctionExitCode(Instruction instr) {
+// NEED TO STORE ALL GLOBAL VARIABLES
+
             // Put ret val in ret reg
             // reset stackpointer: SP = FP + 4*numLocals
             // pop callee save registers
@@ -259,9 +261,11 @@ namespace ScannerParser {
                 REG newReg = GetAvailableReg();
                 AssignRegToSsaVal(newReg, currInstr.instructionNum);
 
+
                 if (CheckImmediateAndReorder(currInstr, out opA, out opB)) {
                     // essentially a move
                     PutConstantInRegister(newReg, opB);
+
                 } else {
                     // will return the register associated with this value
                     if (opB == 0) {
