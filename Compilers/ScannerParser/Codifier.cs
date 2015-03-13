@@ -145,7 +145,7 @@ namespace ScannerParser {
                         return 2; // eats cmp _ _ and bra _ _ 
 
                     }
-                    break;
+                    
                 default:
                     Error(String.Format("Unable to classify opcode {0}", opCode));
                     break;

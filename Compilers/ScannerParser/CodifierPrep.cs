@@ -6,8 +6,13 @@ using System.Threading.Tasks;
 
 namespace ScannerParser {
     // Collection of functions to get code ready to be codified
-    class CodifierPrep {
-        ///////////////////////////////////////////////////////////
+    public class CodifierPrep {
+        // Constructor because C# is dumb
+        public CodifierPrep() {
+
+        }
+
+        ////////////////////////////////////////////////////////////
         // Optimization things 
         //////////////////////////////////////////////////////////////
         public static void PerformCopyPropagation(BasicBlock start) {
@@ -59,8 +64,10 @@ namespace ScannerParser {
 
                 AssemblyPC++;
                 curInstr = curInstr.next;
-            }
 
+                
+            }
+            return newblock;
 
 
             // for instruction i in block
@@ -73,10 +80,6 @@ namespace ScannerParser {
             //      check if A's SSAVAl is in table of change pairs
             //      check if B's SSAVal is in table of change pairs
             //      check if result's SSA value is in any change pairs -- if so, remove them
-
-
-
-
         }
      
 
@@ -138,7 +141,7 @@ namespace ScannerParser {
                     Result resA, resB;
                     resA = first == null ? null : first;
                     resB = second == null ? null : second;
-                    ReconstructResult(currInstr, out resA, out resB);
+//                    ReconstructResult(currInstr, out resA, out resB);
 
                   
                 }
@@ -216,11 +219,18 @@ namespace ScannerParser {
                     res = new Result(myKind, operand);
                     break;
                 case Kind.CONST:
-                    res = new Result(myKind, Double.Parse(operand));
+                    double constval;
+                    if (Double.TryParse(operand, out constval))
+                        res = new Result(myKind, (double)constval);
+                    else
+                        res = new Result(myKind, operand);
+                    break;
+                case Kind.ARR:
+                    res = new Result(myKind, operand, null);
                     break;
                 default:
                     Console.WriteLine("ERROR: unable to reconstruct result");
-                    Console.ReadKey();
+                   // Console.ReadKey();
                     break;
             }
             res.lineNumber = ssaval;
@@ -256,6 +266,8 @@ namespace ScannerParser {
                     return Instruction.OperandType.CONSTANT;
                 case Kind.BRA:
                     return Instruction.OperandType.BRANCH;
+                case Kind.ARR:
+                    return Instruction.OperandType.VAR;
                 default:
                     Console.WriteLine("Should not have gotten here");
                     return Instruction.OperandType.ERROR;

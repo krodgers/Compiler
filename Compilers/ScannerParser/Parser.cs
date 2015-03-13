@@ -52,7 +52,7 @@ namespace ScannerParser {
 
         private Stack<BasicBlock> joinBlocks;
         private Stack<BasicBlock> loopHeaderBlocks;
-        private StackList joinBlockListForPhis; 
+        private StackList joinBlockListForPhis;
         private int globalNestingLevel;
         BasicBlock trueBlock, falseBlock, joinBlock;
         Dictionary<int, BasicBlock> flowGraphNodes;
@@ -90,7 +90,7 @@ namespace ScannerParser {
             flowGraphNodes = new Dictionary<int, BasicBlock>();
             loopCounters = new List<int>();
 
-            
+
         }
 
         // Sets initial state of parser
@@ -169,15 +169,13 @@ namespace ScannerParser {
                     if (scannerSym == Token.IDENT || scannerSym == Token.NUMBER) {
                         resB = Factor();
                         res = Combine(tmp, res, resB);
-                    }
-                    else {
+                    } else {
                         scanner.Error("Reached Term but don't have an Identifier or Number");
                     }
 
                 }
 
-            }
-            else {
+            } else {
                 scanner.Error("Reached Term but don't have an Identifier or Number");
             }
             return res;
@@ -190,11 +188,9 @@ namespace ScannerParser {
                 if (res == null)
                     Console.WriteLine("{0}: Factor got null res", AssemblyPC);
 
-            }
-            else if (scannerSym == Token.NUMBER) {
+            } else if (scannerSym == Token.NUMBER) {
                 res = Number();
-            }
-            else if (scannerSym == Token.CALL) {
+            } else if (scannerSym == Token.CALL) {
                 // TODO:: where to put the result of a function call?
                 res = FuncCall();
                 // TODO:: THis might be a hack
@@ -203,25 +199,23 @@ namespace ScannerParser {
                     //TODO:: Something here
                 }
 
-            }
-            else if (scannerSym == Token.OPENPAREN) {
+            } else if (scannerSym == Token.OPENPAREN) {
                 Next();
                 res = Expression();
                 if (scannerSym == Token.CLOSEPAREN) {
                     Next();
-                }
-                else {
+                } else {
                     // todo, evaluate when this happens
                     Console.WriteLine("It happened");
                     if (res.type == Kind.VAR || res.type == Kind.REG) {
 
                         oldAssemblyPC = AssemblyPC;
-                    	//instructionManager.PutLoadInstruction(res, AssemblyPC);
+                        //instructionManager.PutLoadInstruction(res, AssemblyPC);
                         //  res = SSAWriter.LoadVariable(res, AssemblyPC);
                         res = LoadIfNeeded(res);
                         AssemblyPC++;
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
-                        
+
                     } else if (res.type == Kind.ARR) {
                         oldAssemblyPC = AssemblyPC;
                         res = SSAWriter.LoadArrayElement(res, GetArrayDimensions(res.GetValue()), res.GetArrayIndices(), AssemblyPC);
@@ -255,10 +249,10 @@ namespace ScannerParser {
                 Console.WriteLine("{0}: Designator got null res", AssemblyPC);
 
             if (scannerSym == Token.OPENBRACKET) {
-              //  Next(); // eat [
+                //  Next(); // eat [
                 res = MakeArrayReference(res, false);
-//                VerifyToken(Token.CLOSEBRACKET, "Designator: Unmatched [.... missing ]");
-              //  Next();
+                //                VerifyToken(Token.CLOSEBRACKET, "Designator: Unmatched [.... missing ]");
+                //  Next();
 
             }
 
@@ -319,7 +313,7 @@ namespace ScannerParser {
                                     Console.WriteLine("WARNING:{0}: Got Null argument in Function Argument ", AssemblyPC);
                                 }
                                 optionalArguments.Add(currArg);
-                               
+
 
                                 oldAssemblyPC = AssemblyPC;
 
@@ -368,11 +362,11 @@ namespace ScannerParser {
                             VerifyToken(Token.CLOSEPAREN, "Ended up in arguments of function call and didn't parse a number, variable, comma, or expression");
                             Next();
                             if (optionalArguments.Count != currentFunction.numberOfFormalParamters)
-                            Error(String.Format("{0}: Wrong number of parameters for {1}", AssemblyPC, scanner.Id2String(currentFunction.identID)));
+                                Error(String.Format("{0}: Wrong number of parameters for {1}", AssemblyPC, scanner.Id2String(currentFunction.identID)));
 
                         }
 
-                        
+
                         // branch to function
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutFunctionEntry(res, AssemblyPC);
@@ -388,8 +382,7 @@ namespace ScannerParser {
 
                         curBasicBlock = afterBlock;
                         instructionManager.setCurrentBlock(afterBlock);
-                    }
-                    else {
+                    } else {
                         scanner.Error(String.Format("Tried to call an undefined function : {0}", res.GetValue()));
                     }
                     break;
@@ -410,7 +403,7 @@ namespace ScannerParser {
 
                     curBasicBlock.childBlocks.Add(callBlock);
                     callBlock.parentBlocks.Add(curBasicBlock);
-                    
+
                     curBasicBlock = afterBlock;
                     instructionManager.setCurrentBlock(afterBlock);
 
@@ -495,8 +488,7 @@ namespace ScannerParser {
                         if (res.condition != CondOp.ERR) {
                             //string negatedTokenString = Utilities.TokenToInstruction(Utilities.NegatedConditional(res.condition));
                             //PutF1(negatedTokenString, res, new Result(Kind.CONST, "offset")); //todo, need to fix for new PutF1 stuff
-                        }
-                        else {
+                        } else {
                             scanner.Error("The relation in the if did not contain a valid conditional operator");
                         }
 
@@ -522,7 +514,7 @@ namespace ScannerParser {
 
                         // todo, I think the current block needs to be pushed here, not the joinBlock
                         // but need to make sure that the join block gets the instructions it should
-                        
+
 
                         globalNestingLevel++;
 
@@ -548,15 +540,14 @@ namespace ScannerParser {
 
                         Debug.WriteLine("cur join: {0}", curJoinBlock.blockNum);
 
-                        if (curBasicBlock.blockType == BasicBlock.BlockType.FOLLOW)
-                        {
+                        if (curBasicBlock.blockType == BasicBlock.BlockType.FOLLOW) {
                             curBasicBlock.childBlocks.Add(joinBlock);
                             // Insert the branch that will get us back to the header at the end of the loop
                             instructionManager.PutUnconditionalBranch(Token.BRANCH, joinBlock.blockNum, AssemblyPC);
                             SSAWriter.PutUnconditionalBranch(Utilities.TokenToInstruction(Token.BRANCH), joinBlock.blockNum.ToString(), AssemblyPC++);
 
                         }
-                        
+
                         curBasicBlock = parentBlocks.Pop();
                         instructionManager.setCurrentBlock(curBasicBlock);
 
@@ -566,8 +557,7 @@ namespace ScannerParser {
                             // Restore all of the original values for the variables that
                             // were modified in the true branch
 
-                            foreach (KeyValuePair<string, PhiInstruction> phi in curJoinBlock.phiInstructions)
-                            {
+                            foreach (KeyValuePair<string, PhiInstruction> phi in curJoinBlock.phiInstructions) {
                                 UpdateSymbol(symbolTable[phi.Value.symTableID], phi.Value.originalVarVal);
                             }
 
@@ -609,7 +599,7 @@ namespace ScannerParser {
                                 SSAWriter.PutUnconditionalBranch(Utilities.TokenToInstruction(Token.BRANCH), joinBlock.blockNum.ToString(), AssemblyPC++);
 
                             }
-                            
+
                             curBasicBlock = parentBlocks.Pop();
                             instructionManager.setCurrentBlock(curBasicBlock);
                             elseOccurred = true;
@@ -681,7 +671,7 @@ namespace ScannerParser {
                                     // Switch the instruction manager back to the current block
                                     instructionManager.setCurrentBlock(curBasicBlock);
 
-                                    
+
                                 }
                                 if (falseBlock.childBlocks.Count == 0) {
                                     falseBlock.childBlocks.Add(joinBlock);
@@ -717,17 +707,12 @@ namespace ScannerParser {
 
                             List<string> phisToRemove = new List<string>();
 
-                            foreach (KeyValuePair<string, PhiInstruction> phi in curBasicBlock.phiInstructions)
-                            {
+                            foreach (KeyValuePair<string, PhiInstruction> phi in curBasicBlock.phiInstructions) {
                                 PhiInstruction phiInstr = phi.Value;
-                                if (!phiInstr.IsValidPhi())
-                                {
-                                    if (phiInstr.prev == null)
-                                    {
+                                if (!phiInstr.IsValidPhi()) {
+                                    if (phiInstr.prev == null) {
                                         curBasicBlock.firstInstruction = phiInstr.next;
-                                    }
-                                    else
-                                    {
+                                    } else {
                                         phiInstr.prev.next = phiInstr.next;
                                         phiInstr.next.prev = phiInstr.prev;
                                     }
@@ -743,8 +728,7 @@ namespace ScannerParser {
                             while (joinBlocks.Peek().blockNum > joinBlock.blockNum) {
                                 BasicBlock tmp = joinBlocks.Pop();
 
-                                if (tmp.childBlocks.Count <= 0)
-                                {
+                                if (tmp.childBlocks.Count <= 0) {
                                     tmp.childBlocks.Add(joinBlock);
 
                                     // If we are still within a conditional, we need to branch from the end
@@ -766,8 +750,7 @@ namespace ScannerParser {
                             }
                             globalNestingLevel--;
                             Next();
-                        }
-                        else {
+                        } else {
                             scanner.Error("In the if statement and found no token that matches either an else or a then");
                         }
                     }
@@ -775,8 +758,7 @@ namespace ScannerParser {
 
                 }
 
-            }
-            else {
+            } else {
                 scanner.Error("Ended up at If Statement but didn't parse the if keyword");
             }
             // return new Result(); // todo, I don't have any idea what should be in this result, or if it's even needed
@@ -896,8 +878,7 @@ namespace ScannerParser {
 
 
                 Next(); //eat od
-            }
-            else {
+            } else {
                 scanner.Error("The relation in the if did not contain a valid conditional operator");
             }
             //return new Result(); // todo, don't know what this should be either
@@ -947,7 +928,7 @@ namespace ScannerParser {
                 assignSym = scannerSym;
                 Next();
                 Result res2 = Expression(); // value of assignment
-                
+
 
                 // Needs to output a move instruction which for now will be done here,
                 // but maybe should be moved elsewhere
@@ -955,8 +936,8 @@ namespace ScannerParser {
                 if (res1.type == Kind.ARR) {
                     // Need to store arrays differently
                     // TODO:: for now, storing things in memory immediately, but should only store when absolutely necessary
-                 //   res1 = LoadIfNeeded(res1);
-                     // If the thing is potentially a variable
+                    //   res1 = LoadIfNeeded(res1);
+                    // If the thing is potentially a variable
                     int ID = scanner.String2Id(res1.GetValue());
                     if (ID != -1) {
                         UpdateSymbol(symbolTable[ID], null); // log the line number, current result, etc
@@ -965,19 +946,18 @@ namespace ScannerParser {
                     AssemblyPC = SSAWriter.StoreArrayElement(res1, res2, GetArrayDimensions(res1.GetValue()), res1.GetArrayIndices(), AssemblyPC);
 
                     // TODO:: don't update symbol cause it kills everything anyways?
-                } else
-                {
+                } else {
 
                     int oldVarVal = -1;
                     oldAssemblyPC = AssemblyPC;
-                	instructionManager.PutBasicInstruction(Token.BECOMES, res2, res1, AssemblyPC);
+                    instructionManager.PutBasicInstruction(Token.BECOMES, res2, res1, AssemblyPC);
                     SSAWriter.PutInstruction("mov", res2.GetValue(), res1.GetValue(), AssemblyPC);
                     // If the thing is potentially a variable
                     int ID = scanner.String2Id(res1.GetValue());
                     if (ID != -1) {
                         oldVarVal = symbolTable[ID].currLineNumber;
                         UpdateSymbol(symbolTable[ID], null); // log the line number, current result, etc
-                    }                    
+                    }
                     AssemblyPC++;
 
                     // create the phi instruction 
@@ -1015,8 +995,7 @@ namespace ScannerParser {
                                 instructionManager.instructionDictionary[phi.secondOperandSSAVal].referencesToThisValue.Add(phi);
 
                                 // Insert it at the front of the join block's instruction list
-                                if (curJoinBlock.firstInstruction != null)
-                                {
+                                if (curJoinBlock.firstInstruction != null) {
                                     phi.next = curJoinBlock.firstInstruction;
                                     curJoinBlock.firstInstruction.prev = phi;
                                 }
@@ -1026,8 +1005,7 @@ namespace ScannerParser {
 
                                 Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
                                 Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
-                            }
-                            else {
+                            } else {
                                 // A phi instruction for this variable already exists, so we need to
                                 // modify the second operand to reflect the new value
 
@@ -1058,7 +1036,7 @@ namespace ScannerParser {
 
                                 phi.secondOperand = symbolTable[phi.symTableID].currLineNumber.ToString();
                                 phi.secondOperandType = Instruction.OperandType.PHI_OPERAND;
-                                phi.secondOperandSSAVal = (int) Double.Parse(phi.secondOperand);
+                                phi.secondOperandSSAVal = (int)Double.Parse(phi.secondOperand);
 
                                 // Link the phi instruction to the move that created this value
                                 Instruction tmp = curBasicBlock.firstInstruction;
@@ -1078,8 +1056,7 @@ namespace ScannerParser {
 
                                 Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
                                 Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
-                            }
-                            else {
+                            } else {
                                 // A phi instruction for this variable already exists, so we need to
                                 // modify the first operand to reflect the new value
 
@@ -1100,8 +1077,7 @@ namespace ScannerParser {
                             }
                             break;
                         case BasicBlock.BlockType.LOOP_BODY:
-                            if (!curJoinBlock.phiInstructions.ContainsKey(symbolName))
-                            {
+                            if (!curJoinBlock.phiInstructions.ContainsKey(symbolName)) {
                                 Result preHeaderVal = new Result(Kind.REG, String.Format("{0}", oldVarVal));
                                 PhiInstruction phi = new PhiInstruction(AssemblyPC, curJoinBlock, preHeaderVal);
                                 phi.symTableID = scanner.String2Id(symbolName);
@@ -1109,7 +1085,7 @@ namespace ScannerParser {
 
                                 phi.firstOperand = preHeaderVal.GetValue();
                                 phi.firstOperandType = Instruction.OperandType.PHI_OPERAND;
-                                phi.firstOperandSSAVal = (int) Double.Parse(phi.firstOperand);
+                                phi.firstOperandSSAVal = (int)Double.Parse(phi.firstOperand);
 
                                 // Link the phi instruction to the move that created this value and back
                                 phi.neededInstr[0] = instructionManager.instructionDictionary[phi.firstOperandSSAVal];
@@ -1129,8 +1105,7 @@ namespace ScannerParser {
                                 tmp.referencesToThisValue.Add(phi);
 
                                 // Insert it at the front of the join block's instruction list
-                                if (curJoinBlock.firstInstruction != null)
-                                {
+                                if (curJoinBlock.firstInstruction != null) {
                                     phi.next = curJoinBlock.firstInstruction;
                                     curJoinBlock.firstInstruction.prev = phi;
                                 }
@@ -1142,9 +1117,7 @@ namespace ScannerParser {
                                 Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
                                 Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
 
-                            }
-                            else
-                            {
+                            } else {
                                 PhiInstruction phi = curJoinBlock.phiInstructions[symbolName];
                                 phi.secondOperand = symbolTable[phi.symTableID].currLineNumber.ToString();
                                 phi.secondOperandSSAVal = (int)Double.Parse(phi.secondOperand);
@@ -1165,11 +1138,11 @@ namespace ScannerParser {
                         case BasicBlock.BlockType.FOLLOW:
                             break;
                     }
-                
+
                 }
-                   
-                
-               
+
+
+
             } else {
                 scanner.Error("Ended up at Assignment but didn't encounter let keyword");
             }
@@ -1196,7 +1169,7 @@ namespace ScannerParser {
                     case OpCodeClass.COMPARE:
                         // compare
                         oldAssemblyPC = AssemblyPC;
-//                        instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
+                        //                        instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         res = SSAWriter.PutCompare("cmp", newA, newB, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
@@ -1211,8 +1184,7 @@ namespace ScannerParser {
                         break;
                 }
                 //PutF2(Utilities.TokenToInstruction(opCode), loadednewA loadedB);
-            }
-            else if (newA.type == Kind.VAR && newB.type == Kind.CONST) {
+            } else if (newA.type == Kind.VAR && newB.type == Kind.CONST) {
                 switch (Utilities.GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
                         oldAssemblyPC = AssemblyPC;
@@ -1238,8 +1210,7 @@ namespace ScannerParser {
                 }
                 //PutF1(Utilities.TokenToInstruction(opCode) + "i", loadednewA B);
 
-            }
-            else if (newA.type == Kind.REG && newB.type == Kind.CONST) {
+            } else if (newA.type == Kind.REG && newB.type == Kind.CONST) {
                 switch (Utilities.GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
                         oldAssemblyPC = AssemblyPC;
@@ -1265,8 +1236,7 @@ namespace ScannerParser {
                 }
                 //PutF1(Utilities.TokenToInstruction(opCode) + "i", loadednewA B);
 
-            }
-            else if (newA.type == Kind.VAR && newB.type == Kind.REG) {
+            } else if (newA.type == Kind.VAR && newB.type == Kind.REG) {
                 // todo, fill in later because reg is weird right now
 
                 switch (Utilities.GetOpCodeClass(opCode)) {
@@ -1294,8 +1264,7 @@ namespace ScannerParser {
                 }
                 //PutF2(Utilities.TokenToInstruction(opCode), loadednewA B);
 
-            }
-            else if (newB.type == Kind.REG && newA.type == Kind.REG) {
+            } else if (newB.type == Kind.REG && newA.type == Kind.REG) {
 
                 switch (Utilities.GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
@@ -1321,8 +1290,7 @@ namespace ScannerParser {
                         break;
                 }
                 //PutF2(Utilities.TokenToInstruction(opCode), loadednewB, loadedA);
-            }
-            else if (newB.type == Kind.VAR && newA.type == Kind.CONST) {
+            } else if (newB.type == Kind.VAR && newA.type == Kind.CONST) {
 
                 switch (Utilities.GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
@@ -1349,8 +1317,7 @@ namespace ScannerParser {
                 }
                 //PutF1(Utilities.TokenToInstruction(opCode) + "i", loadednewB, A);
 
-            }
-            else if (newB.type == Kind.VAR && newA.type == Kind.REG) {
+            } else if (newB.type == Kind.VAR && newA.type == Kind.REG) {
 
                 switch (Utilities.GetOpCodeClass(opCode)) {
                     case OpCodeClass.ARITHMETIC_REG:
@@ -1377,8 +1344,7 @@ namespace ScannerParser {
                 }
                 //PutF2(Utilities.TokenToInstruction(opCode), loadednewB, A);
 
-            }
-            else if (newB.type == Kind.REG && newA.type == Kind.CONST) {
+            } else if (newB.type == Kind.REG && newA.type == Kind.CONST) {
                 switch (Utilities.GetOpCodeClass(opCode, true)) {
                     case OpCodeClass.ARITHMETIC_IMM:
                         oldAssemblyPC = AssemblyPC;
@@ -1407,7 +1373,7 @@ namespace ScannerParser {
             }
                 // This case causes issues with register allocation as it
                 // is possibly not needed for constants
-              else if (newA.type == Kind.CONST && newB.type == Kind.CONST) {
+                else if (newA.type == Kind.CONST && newB.type == Kind.CONST) {
                 res = new Result(Kind.CONST, (double)0);
                 switch (opCode) {
                     case Token.TIMES:
@@ -1427,8 +1393,8 @@ namespace ScannerParser {
 
             return res;
         }
-	// TODO:: Can't have function parameters and local variables with same name (?)
-        
+        // TODO:: Can't have function parameters and local variables with same name (?)
+
         // Loads a variable from stack/memory if needed
         // Returns argument if doesn't need to be loaded
         private Result LoadIfNeeded(Result variableToLoad) {
@@ -1443,72 +1409,69 @@ namespace ScannerParser {
                 //        Is a local function variable that has no value yet
                 //        Is a local function variable that has a value
 
-		// Case: Variable already has a value
-		if (curSymbol.GetCurrentValue(scopes.Peek()) != null) {
+                // Case: Variable already has a value
+                if (curSymbol.GetCurrentValue(scopes.Peek()) != null) {
                     // Check if the variable has a value already in the scope
                     res = curSymbol.GetCurrentValue(scopes.Peek());
-		}  
-		    // Case: Local Function Variable
-		  else  if (curSymbol.GetType() != typeof(MemoryBasedSymbol) && curSymbol.IsInScope(scopes.Peek()) && curSymbol.GetCurrentValue(scopes.Peek()) == null) {
-			oldAssemblyPC = AssemblyPC;
-			// res = SSAWriter.LoadFunctionArgument(offset, variableToLoad, AssemblyPC);
-			//instructionManager.PutBasicInstruction(Token.MINUS, new Result(Kind.CONST, argSym.functionOffset), new Result(Kind.REG, "$FP"), AssemblyPC);
-			res = new Result(Kind.CONST, (double)0);
-                	instructionManager.PutBasicInstruction(Token.BECOMES, res, variableToLoad, AssemblyPC);
-			SSAWriter.PutInstruction("mov", res.GetValue(), variableToLoad.GetValue(), AssemblyPC);
-                    
-			AssemblyPC++;
-			//                    instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
-			UpdateSymbol(curSymbol, res);
-			//    AssemblyPC += 1;
-			IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
-		    }
-		// Case: Function Parameter
-		    else if (curSymbol.GetType() == typeof(MemoryBasedSymbol) && curSymbol.IsInScope(scopes.Peek()) && curSymbol.GetCurrentValue(scopes.Peek()) == null)  {
-			// load function values
-			MemoryBasedSymbol argSym = (MemoryBasedSymbol)curSymbol;
-			int offset = argSym.GetFunctionArgumentOffset();
-			oldAssemblyPC = AssemblyPC;
-			res = SSAWriter.LoadFunctionArgument(offset, variableToLoad, AssemblyPC);
-			instructionManager.PutBasicInstruction(Token.MINUS, new Result(Kind.CONST, argSym.functionOffset), new Result(Kind.REG, "$FP"), AssemblyPC);
+                } else if (curSymbol.GetType() != typeof(MemoryBasedSymbol) && curSymbol.IsInScope(scopes.Peek()) && curSymbol.GetCurrentValue(scopes.Peek()) == null) {
+                    // Case: Local Function Variable                   
+                    oldAssemblyPC = AssemblyPC;
+                    // res = SSAWriter.LoadFunctionArgument(offset, variableToLoad, AssemblyPC);
+                    //instructionManager.PutBasicInstruction(Token.MINUS, new Result(Kind.CONST, argSym.stackOffset), new Result(Kind.REG, "$FP"), AssemblyPC);
+                    res = new Result(Kind.CONST, (double)0);
+                    instructionManager.PutBasicInstruction(Token.BECOMES, res, variableToLoad, AssemblyPC);
+                    SSAWriter.PutInstruction("mov", res.GetValue(), variableToLoad.GetValue(), AssemblyPC);
 
-			AssemblyPC++;
-			instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
-			UpdateSymbol(curSymbol, res);
-			AssemblyPC += 1;
-			IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
+                    AssemblyPC++;
+                    //                    instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
+                    UpdateSymbol(curSymbol, res);
+                    //    AssemblyPC += 1;
+                    IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
+                } else if (curSymbol.GetType() == typeof(MemoryBasedSymbol) && curSymbol.IsInScope(scopes.Peek()) && curSymbol.GetCurrentValue(scopes.Peek()) == null) {
+                    // Case: Function Parameter
+                    // load function values
+                    MemoryBasedSymbol argSym = (MemoryBasedSymbol)curSymbol;
+                    int offset = argSym.GetFunctionArgumentOffset();
+                    oldAssemblyPC = AssemblyPC;
+                    res = SSAWriter.LoadFunctionArgument(offset, variableToLoad, AssemblyPC);
+                    instructionManager.PutBasicInstruction(Token.MINUS, new Result(Kind.CONST, argSym.stackOffset), new Result(Kind.REG, "$FP"), AssemblyPC);
 
-		    }
-		// Case: Global variable
-		    else  if (curSymbol.GetType() == typeof(MemoryBasedSymbol) && curSymbol.IsGlobal() && curSymbol.GetCurrentValue(scopes.Peek()) == null ) {
-			// Check for unintialized Globals
-			MemoryBasedSymbol argSym = (MemoryBasedSymbol)curSymbol;
-			int offset = argSym.GetFunctionArgumentOffset();
-			oldAssemblyPC = AssemblyPC;
-			// res = SSAWriter.LoadFunctionArgument(offset, variableToLoad, AssemblyPC);
-			//instructionManager.PutBasicInstruction(Token.MINUS, new Result(Kind.CONST, argSym.functionOffset), new Result(Kind.REG, "$FP"), AssemblyPC);
-			res = new Result(Kind.CONST, (double)0);
-                	instructionManager.PutBasicInstruction(Token.BECOMES, res, variableToLoad, AssemblyPC);
-			SSAWriter.PutInstruction("mov", res.GetValue(), variableToLoad.GetValue(), AssemblyPC);
-                    
-			AssemblyPC++;
-			//                    instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
-			UpdateSymbol(curSymbol, res);
-			//    AssemblyPC += 1;
-			IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
-                    
-		    } 
-		
-		
+                    AssemblyPC++;
+                    instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
+                    UpdateSymbol(curSymbol, res);
+                    AssemblyPC += 1;
+                    IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
+
+                } else if (curSymbol.GetType() == typeof(MemoryBasedSymbol) && curSymbol.IsGlobal() && curSymbol.GetCurrentValue(scopes.Peek()) == null) {
+                    // Case: Global variable
+                    // Check for unintialized Globals
+                    MemoryBasedSymbol argSym = (MemoryBasedSymbol)curSymbol;
+                    int offset = argSym.GetFunctionArgumentOffset();
+                    oldAssemblyPC = AssemblyPC;
+                    // res = SSAWriter.LoadFunctionArgument(offset, variableToLoad, AssemblyPC);
+                    //instructionManager.PutBasicInstruction(Token.MINUS, new Result(Kind.CONST, argSym.stackOffset), new Result(Kind.REG, "$FP"), AssemblyPC);
+                    res = new Result(Kind.CONST, (double)0);
+                    instructionManager.PutBasicInstruction(Token.BECOMES, res, variableToLoad, AssemblyPC);
+                    SSAWriter.PutInstruction("mov", res.GetValue(), variableToLoad.GetValue(), AssemblyPC);
+
+                    AssemblyPC++;
+                    //                    instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
+                    UpdateSymbol(curSymbol, res);
+                    //    AssemblyPC += 1;
+                    IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
+
+                }
+
+
             } else if (variableToLoad.type == Kind.ARR) {
                 if (scannerSym == Token.OPENBRACKET)
                     res = MakeArrayReference(res, true);
-                
+
                 instructionManager.PutLoadArray(res, GetArrayDimensions(res.GetValue()), res.GetArrayIndices(), AssemblyPC);
                 res = SSAWriter.LoadArrayElement(res, GetArrayDimensions(res.GetValue()), res.GetArrayIndices(), AssemblyPC);
                 AssemblyPC = res.lineNumber + 1;
             }
-		// 
+            // 
 
             return res;
 
@@ -1598,8 +1561,7 @@ namespace ScannerParser {
             Token funcType = scannerSym;
             if (scannerSym == Token.FUNC || scannerSym == Token.PROC) {
                 Next();
-            }
-            else {
+            } else {
                 scanner.Error("Function Declaration missing function/ procedure keyword");
             }
 
@@ -1620,8 +1582,7 @@ namespace ScannerParser {
                 scopes.Push(nextScopeNumber++);
                 // function should be able to be called from anywhere
                 function.AddScope(scopes.Peek());
-            }
-            else {
+            } else {
                 scopes.Push(nextScopeNumber++);
                 function = new FunctionSymbol(funcType, scanner.id, AssemblyPC, scopes.Peek());
             }
@@ -1665,9 +1626,20 @@ namespace ScannerParser {
             Next(); // eat semi
             // Func Body
             // Variable declarations
+            int symtableSize = symbolTable.Count;
             while (scannerSym == Token.VAR || scannerSym == Token.ARR) {
                 VarDecl();
             }
+            // Record the size of the local variables
+            // TODO:: Do locals need offsets set?
+            int localsSize = 0;
+            for (int i = symtableSize; i < symbolTable.Count; i++ ) {
+                if (symbolTable[i].type == Token.ARR)
+                    localsSize += ((ArraySymbol)symbolTable[i]).GetArraySize();
+                else
+                    localsSize++;
+            }
+            function.sizeOfLocals = localsSize;
             VerifyToken(Token.BEGIN, "Function body missing open bracket");
             Next(); // eat {
             // function statements
@@ -1749,9 +1721,7 @@ namespace ScannerParser {
                 // scope may not actually change -- early return statement
                 return res;
 
-            }
-            else
-            {
+            } else {
                 oldAssemblyPC = AssemblyPC;
                 SSAWriter.ReturnFromProcedure(AssemblyPC);
                 AssemblyPC++;
@@ -1799,7 +1769,7 @@ namespace ScannerParser {
                 } while (scannerSym != Token.IDENT);
 
                 VerifyToken(Token.IDENT, "Array declaration missing name");
-                AddToSymbolTable(new ArraySymbol(Token.ARR, scanner.id, AssemblyPC, dims.ToArray(), scopes.Peek()), scopes.Peek());
+                AddToSymbolTable(new ArraySymbol(Token.ARR, scanner.id, AssemblyPC, dims.ToArray(), scopes.Peek(), -1), scopes.Peek());
 
                 Next(); // eat ident
 
@@ -1849,6 +1819,22 @@ namespace ScannerParser {
             if (s.identID < symbolTable.Count && symbolTable[s.identID] != null) {
                 // already have a symbol with this name
                 symbolTable[s.identID].AddScope(scope);
+            } else if (s.GetType() == typeof(ArraySymbol)) {
+                // need to put the whole array on the stack
+                if (scope == 1) {
+                    // global array4
+                    ArraySymbol curSym = (ArraySymbol) s;
+                    curSym.SetArgumentOffset(nextGlobalOffset);
+                    Console.WriteLine("{0} gets offset {1}", scanner.Id2String(s.identID), nextGlobalOffset);
+                    nextGlobalOffset -= 4 * curSym.GetArraySize();
+                    symbolTable.Insert(scanner.id, curSym);
+
+                } else {
+                    // not global array
+                    symbolTable.Insert(scanner.id, s);
+
+                }
+
             } else if (scope == 1 && s.GetType() != typeof(FunctionSymbol) && s.GetType() != typeof(MemoryBasedSymbol)) {
                 // see if symbol need to be assigned an offset
                 Console.WriteLine("{0} gets offset {1}", scanner.Id2String(s.identID), nextGlobalOffset);
@@ -1891,7 +1877,7 @@ namespace ScannerParser {
                     int index = Int32.Parse(indexer[i].GetValue());
                     if (index >= arrDims[i])
                         Error(String.Format("{0}: Array index {1} out of bounds ({2})", AssemblyPC, index, arrDims[i]));
-                } else if(outputChecks){
+                } else if (outputChecks) {
                     // check at runtime
                     Result bound = new Result(Kind.CONST, arrDims[i]);
                     // put bounds in a register
@@ -1909,23 +1895,18 @@ namespace ScannerParser {
 
 
         }
-       
-        private void IncrementLoopCounters(int oldPC, int newPC)
-        {
+
+        private void IncrementLoopCounters(int oldPC, int newPC) {
             int numInstructions = newPC - oldPC;
-            if (loopCounters.Count > 0)
-            {
-                for (int i = 0; i < loopCounters.Count; i++)
-                {
+            if (loopCounters.Count > 0) {
+                for (int i = 0; i < loopCounters.Count; i++) {
                     loopCounters[i] += numInstructions;
                 }
             }
         }
 
-        private string GetLabel(BasicBlock block, int blockNum)
-        {
-            switch (block.blockType)
-            {
+        private string GetLabel(BasicBlock block, int blockNum) {
+            switch (block.blockType) {
                 case BasicBlock.BlockType.TRUE:
                     return "TRUE_" + blockNum + ":";
                 case BasicBlock.BlockType.FALSE:

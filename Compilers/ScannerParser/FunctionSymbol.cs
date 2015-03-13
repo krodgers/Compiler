@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace ScannerParser {
 
 // Function OR Procedure
-    class FunctionSymbol : Symbol {
+    public class FunctionSymbol : Symbol {
 
         public int numberOfFormalParamters { set; get; } // number of arguments it takes
         public int sizeOfLocals { set; get; } // amount of space needed on the stack
