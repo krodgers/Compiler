@@ -586,6 +586,40 @@ namespace ScannerParser {
                         curBasicBlock = parentBlocks.Pop();
                         instructionManager.setCurrentBlock(curBasicBlock);
 
+                        if (curJoinBlock.firstInstruction != null && curJoinBlock.firstInstruction.opCode == Token.PHI)
+                        {
+                            Dictionary<int, PhiInstruction> phisToMark = new Dictionary<int, PhiInstruction>();
+                            PhiInstruction phis = (PhiInstruction) curJoinBlock.firstInstruction;
+                            while (phis.next != null)
+                            {
+                                if (phisToMark.ContainsKey(phis.symTableID))
+                                {
+                                    phisToMark[phis.symTableID].useMarker = false;
+                                    phisToMark[phis.symTableID] = phis;
+                                    phis.useMarker = true;
+                                    curJoinBlock.lastMarkedInstruction = phis.instructionNum;
+                                }
+                                else
+                                {
+                                    phisToMark[phis.symTableID] = phis;
+                                    phis.useMarker = true;
+                                }
+                                
+                                phis = (PhiInstruction) phis.next;
+                            }
+                            if (phisToMark.ContainsKey(phis.symTableID)) {
+                                phisToMark[phis.symTableID].useMarker = false;
+                                phisToMark[phis.symTableID] = phis;
+                                phis.useMarker = true;
+                                curJoinBlock.lastMarkedInstruction = phis.instructionNum;
+                            }
+                            else {
+                                phisToMark[phis.symTableID] = phis;
+                                phis.useMarker = true;
+                            }
+                            curJoinBlock.sideOnePhis = phisToMark;
+                        }
+
                         BasicBlock falseBlock = null;
                         if (scannerSym == Token.ELSE) {
 
@@ -641,6 +675,46 @@ namespace ScannerParser {
                             curBasicBlock = parentBlocks.Pop();
                             instructionManager.setCurrentBlock(curBasicBlock);
                             elseOccurred = true;
+
+                            if (curJoinBlock.firstInstruction != null && curJoinBlock.firstInstruction.opCode == Token.PHI) {
+                                Dictionary<int, PhiInstruction> phisToMark = new Dictionary<int, PhiInstruction>();
+
+                                PhiInstruction phis = (PhiInstruction) curJoinBlock.firstInstruction;
+                                if (curJoinBlock.lastMarkedInstruction != 0) {
+                                    while (phis.instructionNum != curJoinBlock.lastMarkedInstruction)
+                                        phis = (PhiInstruction)phis.next;
+                                    phis = (PhiInstruction)phis.next;
+                                }
+                                else {
+                                    phis = (PhiInstruction) curJoinBlock.firstInstruction;
+                                }
+
+                                while (phis.next != null) {
+                                    if (phisToMark.ContainsKey(phis.symTableID)) {
+                                        phisToMark[phis.symTableID].useMarker = false;
+                                        phisToMark[phis.symTableID] = phis;
+                                        phis.useMarker = true;
+                                        curJoinBlock.lastMarkedInstruction = phis.instructionNum;
+                                    }
+                                    else {
+                                        phisToMark[phis.symTableID] = phis;
+                                        phis.useMarker = true;
+                                    }
+
+                                    phis = (PhiInstruction)phis.next;
+                                }
+                                if (phisToMark.ContainsKey(phis.symTableID)) {
+                                    phisToMark[phis.symTableID].useMarker = false;
+                                    phisToMark[phis.symTableID] = phis;
+                                    phis.useMarker = true;
+                                    curJoinBlock.lastMarkedInstruction = phis.instructionNum;
+                                }
+                                else {
+                                    phisToMark[phis.symTableID] = phis;
+                                    phis.useMarker = true;
+                                }
+                                curJoinBlock.sideTwoPhis = phisToMark;
+                            }
                         }
                         if (scannerSym == Token.FI) {
                             if (!elseOccurred) {
@@ -742,8 +816,10 @@ namespace ScannerParser {
                             curBasicBlock.scopeNumber = scopes.Peek();
 
 
-                            // Get rid of duplicate phis
-                            instructionManager.RemoveUnnecessaryPhis(curBasicBlock, ref AssemblyPC);
+                            // Resolve all of the phis
+                            var finalPhis = instructionManager.ResolvePhis(curJoinBlock, ref AssemblyPC);
+                            curJoinBlock.phiInstructions = finalPhis;
+                            //instructionManager.RemoveUnnecessaryPhis(curBasicBlock, ref AssemblyPC);
 
 
                             // Commit all of the phis

@@ -20,6 +20,9 @@ namespace ScannerParser {
         public int scopeNumber;
         public BlockType blockType;
         public Dictionary<int, PhiInstruction> phiInstructions;
+        public int lastMarkedInstruction;
+        public Dictionary<int, PhiInstruction> sideOnePhis;
+        public Dictionary<int, PhiInstruction> sideTwoPhis;
 
         public BasicBlock(int myNumber) {
             blockNum = myNumber;
