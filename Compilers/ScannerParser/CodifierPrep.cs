@@ -9,7 +9,9 @@ namespace ScannerParser {
     // Collection of functions to get code ready to be codified
     public class CodifierPrep {
 
-        private static Dictionary<int, Result> lineNumToResult; 
+        private static Dictionary<int, Result> lineNumToResult;
+        private static Dictionary<int, List<Instruction>> blockNum_branch;
+
         private static int AssemblyPC;
         // Constructor because C# is dumb
         public CodifierPrep() {
@@ -19,7 +21,7 @@ namespace ScannerParser {
         ////////////////////////////////////////////////////////////
         // Optimization things 
         //////////////////////////////////////////////////////////////
-        public static Queue<BasicBlock> PerformCopyPropagation(BasicBlock start, List<Symbol> symTable) {
+        public static Queue<BasicBlock> PerformCopyPropagation(BasicBlock start, List<Symbol> symTable, out int totalNumberOfLines) {
             Queue<BasicBlock> blocks = Utilities.TraverseCFG(ref start);
             Queue<BasicBlock> blocksPropped = new Queue<BasicBlock>();
 
@@ -29,6 +31,7 @@ namespace ScannerParser {
             Dictionary<string, int> variVals = new Dictionary<string, int>();
             Dictionary<int, int> pairsToSwap = new Dictionary<int, int>();
             lineNumToResult = new Dictionary<int, Result>(); // maps ssa values --> results
+            blockNum_branch = new Dictionary<int, List<Instruction>>(); // maps block num --> instructions that needs it
             AssemblyPC = 0;
 
             blockNum_swapPairs[0] = pairsToSwap;
@@ -52,8 +55,29 @@ namespace ScannerParser {
 
             }
 
+            // fix branch locations
+            Instruction curr;
+            int numLines = 0, blockNum = 0;
+            int currLine;
+            foreach (BasicBlock bb in blocksPropped) {
+                curr = bb.firstInstruction;
+                blockNum = bb.blockNum;
+                if (blockNum_branch.ContainsKey(blockNum)) {
+                    foreach (Instruction i in blockNum_branch[blockNum]) {
+                        if (i.secondOperandType == Instruction.OperandType.BRANCH) {
+                            i.secondOperand = String.Format("{0}", (numLines - i.instructionNum) +1);
+                            i.secondOperandSSAVal = 0;
+                        } else {
+                             i.firstOperand = String.Format("{0", bb.firstInstruction.instructionNum - numLines);
+                             i.firstOperandSSAVal = 0;
+                        }
+                    }
+                }
+                numLines += bb.instructionCount;
 
-
+            }
+            
+            totalNumberOfLines = numLines;
 
 
             return blocksPropped;
@@ -100,13 +124,29 @@ namespace ScannerParser {
                             variableValues.Add(variableResult.GetValue(), valueResult.lineNumber);
                         }
                         swapPairs.Add(AssemblyPC, valueResult.lineNumber);
-                        PutInstruction(curInstr.opCode, valueResult, variableResult, AssemblyPC, ref im);
+// not loading a new value, don't need the move instruction
+                        if (!changeFirstOper)
+                            PutInstruction(curInstr.opCode, valueResult, variableResult, AssemblyPC, ref im);
                         break;
                     case Token.RETURN:
                     case Token.END:
-                        resA= changeFirstOper ? lineNumToResult[swapPairs[curInstr.firstOperandSSAVal]] : ReconstructResult(curInstr.firstOperandType, curInstr.firstOperand, AssemblyPC);
+                        resA=  changeFirstOper ? lineNumToResult[swapPairs[curInstr.firstOperandSSAVal]] : ReconstructResult(curInstr.firstOperandType, curInstr.firstOperand, AssemblyPC);
                         PutInstruction(curInstr.opCode, resA, null, AssemblyPC, ref im);
                         break;
+                    case Token.PHI:
+                    // phis kill assignments
+                        resA = changeFirstOper ? lineNumToResult[swapPairs[curInstr.firstOperandSSAVal]] : ReconstructResult(curInstr.firstOperandType, curInstr.firstOperand, AssemblyPC);
+                        resB = changeSecondOper ? lineNumToResult[swapPairs[curInstr.secondOperandSSAVal]] : ReconstructResult(curInstr.secondOperandType, curInstr.secondOperand, AssemblyPC);
+                        foreach (KeyValuePair<int, int> pair in swapPairs) {
+                            if (pair.Value == curInstr.firstOperandSSAVal || pair.Value == curInstr.secondOperandSSAVal)
+                                swapPairs.Remove(pair.Key);
+                        }
+                        break;
+                    case Token.PLUS:
+                    case Token.MINUS:
+                    case Token.TIMES:
+                    case Token.DIV:
+
                     default:
                          resA = changeFirstOper ? lineNumToResult[swapPairs[curInstr.firstOperandSSAVal]] : ReconstructResult(curInstr.firstOperandType, curInstr.firstOperand, AssemblyPC);
                          resB = changeSecondOper ? lineNumToResult[swapPairs[curInstr.secondOperandSSAVal]] : ReconstructResult(curInstr.secondOperandType, curInstr.secondOperand, AssemblyPC);
@@ -139,8 +179,8 @@ namespace ScannerParser {
         }
 
 
-
         private static void PutInstruction(Token opcode, Result resA, Result resB, int lineNumber, ref InstructionManager im) {
+// both results can't be constants
             // Add updated instruction to newblock
             switch (opcode) {
                 case Token.TIMES:
@@ -162,12 +202,36 @@ namespace ScannerParser {
                 case Token.LEQ:
                 case Token.GTR:
                 case Token.BRANCH:
-                    if (KindToOperandType(resA) == Instruction.OperandType.BRANCH)
-                        im.PutUnconditionalBranch(opcode, Int32.Parse(resA.GetValue()), lineNumber);
-                    else if (KindToOperandType(resB) == Instruction.OperandType.BRANCH)
+                    if (KindToOperandType(resA) == Instruction.OperandType.BRANCH) {
+                        int blockToBranchTo = Int32.Parse(resA.GetValue()); 
+                        im.PutUnconditionalBranch(opcode, blockToBranchTo, lineNumber);
+                        // track we need to fix the jump location
+                        if (blockNum_branch.ContainsKey(blockToBranchTo)) {
+                            List<Instruction> branches = blockNum_branch[blockToBranchTo];
+                            branches.Add(im.GetInstruction(lineNumber));
+                            blockNum_branch[blockToBranchTo] = branches;
+                        } else {
+                            List<Instruction> branches = new List<Instruction>();
+                            branches.Add(im.GetInstruction(lineNumber));
+                            blockNum_branch.Add(blockToBranchTo, branches);
+                        }
+                     
+                    } else if (KindToOperandType(resB) == Instruction.OperandType.BRANCH) {
+                        int blockToBranchTo = Int32.Parse(resB.GetValue());
                         im.PutConditionalBranch(opcode, resA, resB.GetValue(), lineNumber);
-                    else
+                        if (blockNum_branch.ContainsKey(blockToBranchTo)) {
+                            List<Instruction> branches = blockNum_branch[blockToBranchTo];
+                            branches.Add(im.GetInstruction(lineNumber));
+                            blockNum_branch[blockToBranchTo] = branches;
+                        } else {
+                            List<Instruction> branches = new List<Instruction>();
+                            branches.Add(im.GetInstruction(lineNumber));
+                            blockNum_branch.Add(blockToBranchTo, branches);
+                        }
+
+                    } else {
                         im.PutCompare(opcode, resA, resB, lineNumber);
+                    }
                     break;
                 case Token.END:
                 case Token.RETURN:

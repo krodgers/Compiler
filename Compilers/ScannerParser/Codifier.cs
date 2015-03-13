@@ -18,6 +18,7 @@ namespace ScannerParser {
 
 
         private StreamWriter sw;
+        private int nextExtraSSAVal;
         private int AssemblyPC, currRegister;
         private Dictionary<int,REG> ssaToReg; // maps ssa values to registers
     //    private Dictionary<int, REG> varToReg; // maps vars to registers
@@ -25,9 +26,10 @@ namespace ScannerParser {
         private Dictionary<string, int> symbols; // maps symbol string to ssaVals
 
         // TODO:: What thing should be passed in?  Reference to CFG?
-        public Codifier(string outputFileName) {
+        public Codifier(string outputFileName, int numberofLinesInFile) {
             sw = new StreamWriter(new FileStream(outputFileName, FileMode.OpenOrCreate, FileAccess.Write));
             sw.AutoFlush = true;
+            nextExtraSSAVal = numberofLinesInFile + 5; // for good measure
             init();
 
         }
@@ -63,7 +65,7 @@ namespace ScannerParser {
         public void CodifyBlock(BasicBlock bb) {
             init(); 
             Instruction currInstr = bb.firstInstruction;
-            int numInstrUsed;
+            int numInstrUsed = 0;
             while (currInstr != null) {
                 numInstrUsed = WriteInstruction(currInstr.opCode, currInstr);
                 if (numInstrUsed != 1) {
@@ -72,6 +74,7 @@ namespace ScannerParser {
                 } else
                     currInstr = currInstr.next;
             }
+            
         }
         
         ////////////////////////////////////
@@ -159,9 +162,10 @@ namespace ScannerParser {
             REG bVal;
             int cVal;
             REG storageReg = GetAvailableReg(); // TODO:: This needs to be fixed.  but while we don't have register allocation...
-            AssignRegToSsaVal(storageReg, currInstr.instructionNum);
-           
-            bool isImmediate = CheckImmediateAndReorder(currInstr, out opB, out opC);
+//            AssignRegToSsaVal(storageReg, currInstr.instructionNum);
+              AssignRegToSsaVal(storageReg, currInstr.instructionNum);
+
+              bool isImmediate = CheckImmediateAndReorder(currInstr, out opB, out opC);
             if (isImmediate) {
                 bVal = GetRegister(opB);
             //    cVal =  Int32.Parse(Regex.Match(currInstr.secondOperand, "[0-9]+").Value);
@@ -172,6 +176,8 @@ namespace ScannerParser {
             }
             
             PutMathInstruction(opCode, storageReg, bVal, cVal, isImmediate);
+
+           
         }
 
         // puts opcode A B C
@@ -182,7 +188,7 @@ namespace ScannerParser {
              else 
                 PutInstruction(opCode, (int)whereToStore, (int)operandB, operandC);
 
-            
+            AssemblyPC++;
         }
 
 
@@ -238,6 +244,17 @@ namespace ScannerParser {
 
             // pop return address into $ra
             // return to caller --> jump $ra
+            switch (instr.opCode) {
+                case Token.RETURN:
+                case Token.END:
+                    int retval, useless;
+                    if (CheckImmediateAndReorder(instr, out useless, out retval)) {
+                        PutImmInstruction(instr.opCode, retval);
+                    } else {
+                        PutImmInstruction(instr.opCode, 0);
+                    }
+                    break;
+            }
         }
 
         // Stores $RA and branches to 4*c
@@ -419,15 +436,18 @@ namespace ScannerParser {
         private void PutBranchInstruction(Token opcode, int registerToCheck, int placeToBranch) {
             sw.WriteLine(String.Format("{0} {1} {2}", Utilities.TokenToBranchInstruction(opcode), registerToCheck, placeToBranch));
             Console.WriteLine(String.Format("{0} {1} #{2}", Utilities.TokenToBranchInstruction(opcode), (REG)registerToCheck, placeToBranch));
+            AssemblyPC++;
         }
 
         private void PutBranchInstruction(Token opcode, int registerToCheck, string placeToBranch) {
             sw.WriteLine(String.Format("{0} {1} {2}", Utilities.TokenToBranchInstruction(opcode), registerToCheck, placeToBranch));
             Console.WriteLine(String.Format("{0} {1} {2}", Utilities.TokenToBranchInstruction(opcode), (REG)registerToCheck, placeToBranch));
+            AssemblyPC++;
         }
         private void PutImmBranchInstruction(Token opcode, int registerToCheck, int placeToBranch) {
             sw.WriteLine(String.Format("{0} {1} {2}", Utilities.TokenToBranchInstruction(opcode), registerToCheck, placeToBranch));
             Console.WriteLine(String.Format("{0} {1} #{2}", Utilities.TokenToBranchInstruction(opcode), (REG)registerToCheck, placeToBranch));
+            AssemblyPC++;        
         }
         
 
@@ -485,50 +505,60 @@ namespace ScannerParser {
         private void PutInstruction(Token opcode, int A, int B, int C) {
             sw.WriteLine(String.Format("{0} {1} {2} {3}", TokenToInstruction(opcode), A, B, C));
             Console.WriteLine(String.Format("{0} {1} {2} {3}", TokenToInstruction(opcode), (REG)A, (REG)B, (REG)C));
-
+            AssemblyPC++;
         }
         private void PutImmInstruction(Token opcode, int A, int B, int C) {
             sw.WriteLine(String.Format("{0}i {1} {2} {3}", TokenToInstruction(opcode), A, B, C));
             Console.WriteLine(String.Format("{0}i {1} {2} #{3}", TokenToInstruction(opcode), (REG)A, (REG)B, C));
+            AssemblyPC++;
         }
         private void PutInstruction(string opcode, int A, int B, int C) {
             sw.WriteLine(String.Format("{0} {1} {2} {3}", opcode, A, B, C));
             Console.WriteLine(String.Format("{0} {1} {2} {3}", opcode, (REG)A, (REG)B, (REG)C));
+            AssemblyPC++;
 
         }
 
         private void PutInstruction(Token opcode, int A, int B) {
             sw.WriteLine(String.Format("{0} {1} {2}", TokenToInstruction(opcode), A, B));
             Console.WriteLine(String.Format("{0} {1} {2}", TokenToInstruction(opcode), (REG)A, (REG)B));
+            AssemblyPC++;
 
         }
         private void PutImmInstruction(Token opcode, int A, int B) {
             sw.WriteLine(String.Format("{0} {1} {2}", TokenToInstruction(opcode), A, B));
             Console.WriteLine(String.Format("{0} {1} #{2}", TokenToInstruction(opcode), (REG)A, B));
+            AssemblyPC++;
 
         }
         private void PutInstruction(string opcode, int A, int B) {
             sw.WriteLine(String.Format("{0} {1} {2}", opcode, A, B));
             Console.WriteLine(String.Format("{0} {1} {2}", opcode, (REG)A, (REG)B));
+            AssemblyPC++;
 
         }
         private void PutInstruction(Token opcode, int A) {
             sw.WriteLine(String.Format("{0} {1}", TokenToInstruction(opcode), A));
             Console.WriteLine(String.Format("{0} {1}", TokenToInstruction(opcode), (REG)A));
+            AssemblyPC++;
 
         }
         private void PutInstruction(string opcode, int A) {
             sw.WriteLine(String.Format("{0} {1}", opcode, A));
             Console.WriteLine(String.Format("{0} {1}", opcode, (REG)A));
+            AssemblyPC++;
         }
         private void PutImmInstruction(Token opcode, int A) {
             sw.WriteLine(String.Format("{0} {1}", TokenToInstruction(opcode), A));
             Console.WriteLine(String.Format("{0} #{1}", TokenToInstruction(opcode), A));
+            AssemblyPC++;
         }
           private void PutImmInstruction(string opcode, int A) {
             sw.WriteLine(String.Format("{0} {1}", opcode, A));
             Console.WriteLine(String.Format("{0} #{1}", opcode, A));
+            AssemblyPC++;
         }
+
 
         private void Write(string toWrite) {
             sw.WriteLine(toWrite);
@@ -565,9 +595,15 @@ namespace ScannerParser {
 
             // Can't have both be constants
             if (instr.firstOperandType == Instruction.OperandType.CONSTANT && instr.secondOperandType == Instruction.OperandType.CONSTANT) {
-                Error("Both operands cannot be constants");
-            }
-            if (instr.firstOperandType == Instruction.OperandType.CONSTANT) {
+                if (CheckDoubleConstants(instr, out opAValue, out opBValue)) {
+                    immediate = true;
+                    AssignRegToSsaVal((REG)opAValue, nextExtraSSAVal);
+
+                    opAValue = nextExtraSSAVal++;
+                    opBValue = Int32.Parse(instr.secondOperand);
+                    
+                }
+            } else if (instr.firstOperandType == Instruction.OperandType.CONSTANT) {
                 immediate = true;
                 Debug.Assert(instr.secondOperandType != Instruction.OperandType.CONSTANT, "Both operands are constants");
                 opAValue = instr.secondOperandSSAVal;
@@ -591,38 +627,46 @@ namespace ScannerParser {
         /// <summary>
         /// Checks if both operands are constants
         /// If so, puts one into a register
+        /// If returns false, values in opAValue and opBValue are invalid
         /// </summary>
         /// <param name="instr"></param>
-        /// <param name="opAValue"> The SSA value of the registered value</param>
-        /// <param name="opBValue"> The value of the constant or the SSA value of a registerValue</param>
-        /// <returns> true if opBValue is a constant value</returns>
+        /// <param name="opAValue"> The register value the immediate got put into</param>
+        /// <param name="opBValue"> The value of the constant</param>
+        /// <returns> true if both were constants; opBvalue is a constant value</returns>
         private bool CheckDoubleConstants(Instruction instr, out int opAValue, out int opBValue) {
             bool immediate = false;
 
-            // Can't have both be constants
+//Both are constants
             if (instr.firstOperandType == Instruction.OperandType.CONSTANT && instr.secondOperandType == Instruction.OperandType.CONSTANT) {
-               // load one into a register
+                // load one into a register
                 REG storage = GetAvailableReg();
-
-            }
-            if (instr.firstOperandType == Instruction.OperandType.CONSTANT) {
-                immediate = true;
-                Debug.Assert(instr.secondOperandType != Instruction.OperandType.CONSTANT, "Both operands are constants");
-                opAValue = instr.secondOperandSSAVal;
-                opBValue = Int32.Parse(instr.firstOperand); // 1st operand is the immediate value
-
-
-            } else if (instr.secondOperandType == Instruction.OperandType.CONSTANT) {
-                immediate = true;
-                opAValue = instr.firstOperandSSAVal;
+                PutConstantInRegister(storage, Int32.Parse(instr.firstOperand));
+                opAValue = (int)storage;
                 opBValue = Int32.Parse(instr.secondOperand);
-                Debug.Assert(instr.firstOperandType != Instruction.OperandType.CONSTANT, "Both operands are constants");
-            } else {
-                // no constants
-                opAValue = instr.firstOperandSSAVal;
-                opBValue = instr.secondOperandSSAVal;
-            }
 
+                immediate = true;
+            }
+                //}else  if (instr.firstOperandType == Instruction.OperandType.CONSTANT) {
+                //    immediate = true;
+                //    Debug.Assert(instr.secondOperandType != Instruction.OperandType.CONSTANT, "Both operands are constants");
+                //    opAValue = instr.secondOperandSSAVal;
+                //    opBValue = Int32.Parse(instr.firstOperand); // 1st operand is the immediate value
+
+
+            //} else if (instr.secondOperandType == Instruction.OperandType.CONSTANT) {
+                //    immediate = true;
+                //    opAValue = instr.firstOperandSSAVal;
+                //    opBValue = Int32.Parse(instr.secondOperand);
+                //    Debug.Assert(instr.firstOperandType != Instruction.OperandType.CONSTANT, "Both operands are constants");
+                //} else {
+                //    // no constants
+                //    opAValue = instr.firstOperandSSAVal;
+                //    opBValue = instr.secondOperandSSAVal;
+                //}
+            else {
+                opAValue = -3;
+                opBValue = -4;
+            }
 
             return immediate;
         }
@@ -648,22 +692,12 @@ namespace ScannerParser {
                     opString = "chk";
                     break;    
                 case Token.EQL:
-                    opString =  "beq";
-                    break;
                 case Token.NEQ:
-                    opString =  "bne";
-                    break;
                 case Token.LSS:
-                    opString =  "blt";
-                    break;
                 case Token.GTR:
-                    opString =  "bgt";
-                    break;
                 case Token.LEQ:
-                    opString =  "ble";
-                    break;
                 case Token.GEQ:
-                    opString =  "bge";
+                    opString =  "cmp";
                     break;
                 case Token.OUTPUTNUM:
                     opString = "wrd";
