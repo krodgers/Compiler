@@ -9,11 +9,13 @@ using System.Threading.Tasks;
 
 namespace ScannerParser {
     public class InstructionManager {
-        public Dictionary<int, Instruction> instructionDictionary;
+        private Dictionary<int, Instruction> instructionDictionary;
         private BasicBlock curBasicBlock;
+        private List<Symbol> symbolTable;
 
-        public InstructionManager() {
+        public InstructionManager(List<Symbol> symbolTable) {
             instructionDictionary = new Dictionary<int, Instruction>();
+            this.symbolTable = symbolTable;
         }
 
         public void setCurrentBlock(BasicBlock current) {
@@ -155,7 +157,7 @@ namespace ScannerParser {
             tmp.opCode = Token.BRANCH;
 
             tmp.firstOperand = "$RA";
-            tmp.firstOperandType = Instruction.OperandType.REG; 
+            tmp.firstOperandType = Instruction.OperandType.REG;
 
             // Add the new instruction to the dictionary of all instructions
             instructionDictionary.Add(lineNumber, tmp);
@@ -166,8 +168,7 @@ namespace ScannerParser {
 
         // branches to branchlocation unconditionally
         // i.e. branch TRUE
-        public void PutUnconditionalBranch(Token opCode, int branchLocation, int lineNumber)
-        {
+        public void PutUnconditionalBranch(Token opCode, int branchLocation, int lineNumber) {
             Instruction tmp = new Instruction(lineNumber, curBasicBlock);
             tmp.opCode = opCode;
 
@@ -181,7 +182,7 @@ namespace ScannerParser {
             InsertAndLink(tmp);
         }
         // cmp A B
-        public void PutCompare(Token opCode, Result operandA, Result operandB,int lineNumber ) {
+        public void PutCompare(Token opCode, Result operandA, Result operandB, int lineNumber) {
             PutBasicInstruction(opCode, operandA, operandB, lineNumber);
 
         }
@@ -197,8 +198,7 @@ namespace ScannerParser {
         // Branch on condition
         // condResult -- the compare result this branch is dependent on
         // tempLabel -- the place to branch to ---- complete unused
-        public void PutConditionalBranch(Token opCode, Result condResult, string tempLabel, int lineNumber)
-        {
+        public void PutConditionalBranch(Token opCode, Result condResult, string tempLabel, int lineNumber) {
             Instruction tmp = new Instruction(lineNumber, curBasicBlock);
             tmp.opCode = opCode;
 
@@ -224,7 +224,7 @@ namespace ScannerParser {
         public void PutLoadArray(Result array, int[] dims, Result[] indices, int lineNum) {
             Result currentResult;
             int lineNumber = PutArrayAddress(array, dims, indices, lineNum, out currentResult);
-            
+
             // add FP + Base
             Result arrayBase = new Result(Kind.REG, String.Format("({0})", lineNumber));
             PutBasicInstruction(Token.PLUS, new Result(Kind.REG, "FP"), array, lineNumber++);
@@ -249,7 +249,7 @@ namespace ScannerParser {
             Result finalResult = new Result(Kind.REG, String.Format("({0})", lineNumber));
             finalResult.lineNumber = lineNumber;
 
-            PutBasicInstruction(Token.STORE, thingToStore, finalResult,  lineNumber);
+            PutBasicInstruction(Token.STORE, thingToStore, finalResult, lineNumber);
         }
 
 
@@ -268,7 +268,8 @@ namespace ScannerParser {
                 if (indices[i].type == Kind.CONST) {
                     // Continue accumulating a constant address
                     addr += constantAccum * Int32.Parse(indices[i].GetValue());
-                } else {
+                }
+                else {
                     currentResult = new Result(Kind.REG, String.Format("({0})", lineNumber));
                     PutBasicInstruction(Token.TIMES, new Result(Kind.CONST, constantAccum), indices[i], lineNumber);
                     termsToAdd.Add(currentResult);
@@ -309,6 +310,279 @@ namespace ScannerParser {
             return lineNumber;
         }
 
+        public void PutPhiInstruction(int lineNumber, BasicBlock curJoinBlock, int symTableID, Result oldVarVal, string symbolName) {
+
+            Instruction tmp;
+
+            Result preBranchVal = oldVarVal;
+            PhiInstruction phi = new PhiInstruction(lineNumber, curJoinBlock, preBranchVal, symbolName);
+            phi.symTableID = symTableID;
+            phi.opCode = Token.PHI;
+
+            // todo, need to check curJoinBlock type, not the cur basic block type. Also
+            // need to make sure that each type of cur basic block will be updated with a phi
+            // properly. There needs to be a phi for EVERY assignment, regardless of what type
+            // of block it is currently
+
+            // todo, the above is solved for loops, but still need to figure out how
+            // to decide which side of the phi instruction to place the new assignments on for ifs,
+            // as we won't know what nodes connect to the join blocks yet
+
+            switch (curJoinBlock.blockType)
+            {
+                case BasicBlock.BlockType.LOOP_HEADER:
+                    phi.firstOperand = preBranchVal.GetValue();
+                    phi.firstOperandType = Instruction.OperandType.SSA_VAL;
+                    phi.firstOperandSSAVal = GetNumFromSSAReg(phi.firstOperand);
+
+                    // Link the phi instruction to the move that created this value and back
+                    phi.neededInstr[0] = instructionDictionary[phi.firstOperandSSAVal];
+                    instructionDictionary[phi.firstOperandSSAVal].referencesToThisValue.Add(phi);
+
+                    phi.secondOperand = String.Format("({0})", symbolTable[phi.symTableID].currLineNumber);
+                    phi.secondOperandType = Instruction.OperandType.PHI_OPERAND;
+                    phi.secondOperandSSAVal = GetNumFromSSAReg(phi.secondOperand);
+
+                    // Link the phi instruction to the move that created this value
+                    tmp = curBasicBlock.firstInstruction;
+                    while (tmp.next != null)
+                        tmp = tmp.next;
+                    phi.neededInstr[1] = tmp;
+                    tmp.referencesToThisValue.Add(phi);
+                    break;
+                case BasicBlock.BlockType.JOIN:
+                    switch (curBasicBlock.blockType)
+                    {
+                        case BasicBlock.BlockType.TRUE:
+                            phi.firstOperand = String.Format("({0})", symbolTable[phi.symTableID].currLineNumber);
+                            phi.firstOperandType = Instruction.OperandType.PHI_OPERAND;
+                            phi.firstOperandSSAVal = GetNumFromSSAReg(phi.firstOperand);
+
+                            // Link the phi instruction to the move that created this value
+                            tmp = curBasicBlock.firstInstruction;
+                            while (tmp.next != null)
+                                tmp = tmp.next;
+                            phi.neededInstr[0] = tmp;
+                            tmp.referencesToThisValue.Add(phi);
+
+                            // Second operand is the initial value
+                            phi.secondOperand = preBranchVal.GetValue();
+                            phi.secondOperandType = Instruction.OperandType.SSA_VAL;
+                            phi.secondOperandSSAVal = GetNumFromSSAReg(phi.firstOperand);
+
+                            // Link the phi instruction to the move that created this value and back
+                            phi.neededInstr[0] = instructionDictionary[phi.secondOperandSSAVal];
+                            instructionDictionary[phi.secondOperandSSAVal].referencesToThisValue.Add(phi);
+                            break;
+
+                        case BasicBlock.BlockType.FALSE:
+                            //todo, need to set the firstOperand to the preBranch value
+
+                            phi.firstOperand = preBranchVal.GetValue();
+                            phi.firstOperandType = Instruction.OperandType.SSA_VAL;
+                            phi.firstOperandSSAVal = GetNumFromSSAReg(phi.firstOperand);
+
+                            // Link the phi instruction to the move that created this value and back
+                            phi.neededInstr[0] = instructionDictionary[phi.firstOperandSSAVal];
+                            instructionDictionary[phi.firstOperandSSAVal].referencesToThisValue.Add(phi);
+
+                            phi.secondOperand = String.Format("({0})", symbolTable[phi.symTableID].currLineNumber);
+                            phi.secondOperandType = Instruction.OperandType.PHI_OPERAND;
+                            phi.secondOperandSSAVal = GetNumFromSSAReg(phi.secondOperand);
+
+                            // Link the phi instruction to the move that created this value
+                            tmp = curBasicBlock.firstInstruction;
+                            while (tmp.next != null)
+                                tmp = tmp.next;
+                            phi.neededInstr[1] = tmp;
+                            tmp.referencesToThisValue.Add(phi);
+                            break;
+                    }
+                    break;
+            }
+
+            // Insert it at the front of the join block's instruction list
+            if (curJoinBlock.firstInstruction != null) {
+                phi.next = curJoinBlock.firstInstruction;
+                curJoinBlock.firstInstruction.prev = phi;
+            }
+
+            curJoinBlock.firstInstruction = phi;
+            curJoinBlock.phiInstructions[symbolName] = phi;
+            curJoinBlock.instructionCount++;
+
+            instructionDictionary.Add(lineNumber, phi);
+        }
+
+        public void UpdatePhiInstruction(string symbolName, BasicBlock curJoinBlock)
+        {
+            // TODO!!!!, change anything with .lineNumber because that isn't set
+
+            Instruction tmp;
+            int ifIndex;
+            PhiInstruction phi = curJoinBlock.phiInstructions[symbolName];
+
+
+            switch (curJoinBlock.blockType)
+            {
+                case BasicBlock.BlockType.LOOP_HEADER:
+                    phi.secondOperand = String.Format("({0})", symbolTable[phi.symTableID].currLineNumber);
+                    phi.secondOperandSSAVal = GetNumFromSSAReg(phi.secondOperand);
+
+                    // Link the phi instruction to the move that created this value
+                    tmp = curBasicBlock.firstInstruction;
+                    while (tmp.next != null)
+                        tmp = tmp.next;
+                    if (phi.neededInstr[1] != null)
+                        phi.neededInstr[1].referencesToThisValue.Remove(phi);
+                    phi.neededInstr[1] = tmp;
+                    tmp.referencesToThisValue.Add(phi);
+                    break;
+                case BasicBlock.BlockType.JOIN:
+                    switch (curBasicBlock.blockType)
+                    {
+                        case BasicBlock.BlockType.TRUE:
+                        case BasicBlock.BlockType.FALSE:
+
+                            if (curBasicBlock.blockType == BasicBlock.BlockType.TRUE) {
+                                phi.firstOperand = String.Format("({0})", symbolTable[phi.symTableID].currLineNumber);
+                                phi.firstOperandSSAVal = GetNumFromSSAReg(phi.firstOperand);
+                                ifIndex = 0;
+                            }
+                            else {
+                                phi.secondOperand = String.Format("({0})", symbolTable[phi.symTableID].currLineNumber);
+                                phi.secondOperandSSAVal = GetNumFromSSAReg(phi.secondOperand);
+                                ifIndex = 1;
+                            }
+
+                            // Link the phi instruction to the move that created this value
+                            tmp = curBasicBlock.firstInstruction;
+                            while (tmp.next != null)
+                                tmp = tmp.next;
+                            if (phi.neededInstr[ifIndex] != null)
+                                phi.neededInstr[ifIndex].referencesToThisValue.Remove(phi);
+                            phi.neededInstr[ifIndex] = tmp;
+                            tmp.referencesToThisValue.Add(phi);
+                            break;
+                    }
+                    break;
+            }
+        }
+
+        public Dictionary<int, PhiInstruction> CommitOuterPhi(ref int lineNumber, BasicBlock curJoinBlock, BasicBlock outerJoinBlock)
+        {
+            Dictionary<int, PhiInstruction> commitIDs = new Dictionary<int, PhiInstruction>();
+
+            foreach (KeyValuePair<string, PhiInstruction> phi in curJoinBlock.phiInstructions)
+            {
+                
+                string phiKey = phi.Key;
+                PhiInstruction curPhi = phi.Value;
+
+                commitIDs.Add(curPhi.symTableID, curPhi);
+
+                if (!outerJoinBlock.phiInstructions.ContainsKey(phiKey))
+                {
+                    Result preBranchVal = new Result(Kind.REG, String.Format("{0}", curPhi.originalVarVal.GetValue()));
+                    PhiInstruction outerPhi = new PhiInstruction(lineNumber, curJoinBlock, preBranchVal, curPhi.targetVar);
+                    outerPhi.symTableID = curPhi.symTableID;
+                    outerPhi.opCode = Token.PHI;
+
+                    switch (outerJoinBlock.blockType)
+                    {
+                        case BasicBlock.BlockType.LOOP_HEADER:
+                        case BasicBlock.BlockType.JOIN:
+                            outerPhi.firstOperand = String.Format("({0})", curPhi.instructionNum);
+                            outerPhi.firstOperandType = Instruction.OperandType.PHI_OPERAND;
+                            outerPhi.firstOperandSSAVal = GetNumFromSSAReg(outerPhi.firstOperand);
+
+                            outerPhi.neededInstr[0] = curPhi;
+                            curPhi.referencesToThisValue.Add(outerPhi);
+
+                            outerPhi.secondOperand = preBranchVal.GetValue();
+                            outerPhi.secondOperandType = Instruction.OperandType.SSA_VAL;
+                            outerPhi.secondOperandSSAVal = GetNumFromSSAReg(outerPhi.secondOperand);
+
+                            outerPhi.neededInstr[1] = instructionDictionary[outerPhi.secondOperandSSAVal];
+                            instructionDictionary[outerPhi.secondOperandSSAVal].referencesToThisValue.Add(outerPhi);
+
+                            break;
+                    }
+
+                    // Insert it at the front of the join block's instruction list
+                    if (outerJoinBlock.firstInstruction != null) {
+                        outerPhi.next = outerJoinBlock.firstInstruction;
+                        outerJoinBlock.firstInstruction.prev = outerPhi;
+                    }
+
+                    outerJoinBlock.firstInstruction = outerPhi;
+                    outerJoinBlock.phiInstructions[curPhi.targetVar] = outerPhi;
+                    outerJoinBlock.instructionCount++;
+
+                    instructionDictionary.Add(lineNumber++, outerPhi);
+                }
+                else
+                {
+                    Instruction outerVersion = outerJoinBlock.phiInstructions[phiKey];
+                    switch (outerJoinBlock.blockType)
+                    {
+                        case BasicBlock.BlockType.LOOP_HEADER:
+                            outerVersion.firstOperand = String.Format("({0})", curPhi.instructionNum);
+                            outerVersion.firstOperandType = Instruction.OperandType.PHI_OPERAND;
+                            outerVersion.firstOperandSSAVal = GetNumFromSSAReg(outerVersion.firstOperand);
+
+                            outerVersion.neededInstr[1] = curPhi;
+                            curPhi.referencesToThisValue.Add(outerVersion);
+                            break;
+                        case BasicBlock.BlockType.JOIN:
+                            outerVersion.secondOperand = String.Format("({0})", curPhi.instructionNum);
+                            outerVersion.secondOperandType = Instruction.OperandType.PHI_OPERAND;
+                            outerVersion.secondOperandSSAVal = GetNumFromSSAReg(outerVersion.secondOperand);
+
+                            outerVersion.neededInstr[1] = curPhi;
+                            curPhi.referencesToThisValue.Add(outerVersion);
+                            break;
+                    }
+                }
+            }
+            return commitIDs;
+        }
+
+        public void PropagateHeaderPhis(BasicBlock loopHeader)
+        {
+            foreach (KeyValuePair<string, PhiInstruction> pair in loopHeader.phiInstructions) {
+                PhiInstruction phi = pair.Value;
+                Instruction oldVal = instructionDictionary[GetNumFromSSAReg(phi.originalVarVal.GetValue())];
+
+                foreach (Instruction reference in oldVal.referencesToThisValue)
+                {
+                    if (reference != phi)
+                    {
+                        if (reference.firstOperandSSAVal == oldVal.instructionNum)
+                        {
+                            reference.firstOperand = String.Format("({0})", phi.instructionNum);
+                            reference.firstOperandType = Instruction.OperandType.SSA_VAL;
+                            reference.firstOperandSSAVal = GetNumFromSSAReg(reference.firstOperand);
+
+                            reference.neededInstr[0] = phi;
+                            phi.referencesToThisValue.Add(reference);
+                        }
+                        else
+                        {
+                            reference.secondOperand = String.Format("({0})", phi.instructionNum);
+                            reference.secondOperandType = Instruction.OperandType.SSA_VAL;
+                            reference.secondOperandSSAVal = GetNumFromSSAReg(reference.firstOperand);
+
+                            reference.neededInstr[1] = phi;
+                            phi.referencesToThisValue.Add(reference);
+                        }
+                    }
+                }
+                
+
+            }
+        }
+
         private int GetNumFromSSAReg(string p) {
             return (int)Decimal.Parse(p, NumberStyles.AllowParentheses) * -1;
         }
@@ -343,14 +617,12 @@ namespace ScannerParser {
                 curBasicBlock.instructionCount++;
             }
 
-            if (curInstruction.firstOperandType == Instruction.OperandType.SSA_VAL)
-            {
+            if (curInstruction.firstOperandType == Instruction.OperandType.SSA_VAL) {
                 curInstruction.neededInstr[0] = instructionDictionary[curInstruction.firstOperandSSAVal];
                 instructionDictionary[curInstruction.firstOperandSSAVal].referencesToThisValue.Add(curInstruction);
             }
 
-            if (curInstruction.secondOperandType == Instruction.OperandType.SSA_VAL)
-            {
+            if (curInstruction.secondOperandType == Instruction.OperandType.SSA_VAL) {
                 curInstruction.neededInstr[1] = instructionDictionary[curInstruction.secondOperandSSAVal];
                 instructionDictionary[curInstruction.secondOperandSSAVal].referencesToThisValue.Add(curInstruction);
             }

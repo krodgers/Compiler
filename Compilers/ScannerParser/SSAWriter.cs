@@ -270,7 +270,7 @@ namespace ScannerParser {
         /////////////////////////////////////////////
         // Code to be added before giving to codifier
         ////////////////////////////////////////////
-        private void PutFunctionProlouge(FunctionSymbol func) {
+        private void PutFunctionPrologue(FunctionSymbol func) {
 
 
         }
