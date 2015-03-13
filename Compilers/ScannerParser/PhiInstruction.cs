@@ -10,7 +10,6 @@ namespace ScannerParser {
         public Result originalVarVal;
         public string targetVar;
         public int symTableID { get; set; }
-        public string augmentedSymbolID;
         public PhiInstruction(int instructionNumber, BasicBlock myBB, Result originalVarVal, string targetVar) : base(instructionNumber, myBB)
         {
             this.originalVarVal = originalVarVal;
