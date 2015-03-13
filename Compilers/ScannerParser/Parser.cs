@@ -1030,6 +1030,8 @@ namespace ScannerParser {
                     if (ID != -1)
                     {
                         oldVarVal = symbolTable[ID].GetCurrentValue(scopes.Peek());
+                        if (oldVarVal == null)
+                            oldVarVal = new Result(Kind.CONST, 0.0);
                         UpdateSymbol(symbolTable[ID], null); // log the line number, current result, etc
                     }
                     AssemblyPC++;
