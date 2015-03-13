@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace ScannerParser {
     // Collection of functions to get code ready to be codified
     public class CodifierPrep {
 
         private static Dictionary<int, Result> lineNumToResult; 
-
+        private static int AssemblyPC;
         // Constructor because C# is dumb
         public CodifierPrep() {
 
@@ -28,6 +29,7 @@ namespace ScannerParser {
             Dictionary<string, int> variVals = new Dictionary<string, int>();
             Dictionary<int, int> pairsToSwap = new Dictionary<int, int>();
             lineNumToResult = new Dictionary<int, Result>(); // maps ssa values --> results
+            AssemblyPC = 0;
 
             blockNum_swapPairs[0] = pairsToSwap;
             blockNum_variVals[0] = variVals;
@@ -67,8 +69,7 @@ namespace ScannerParser {
             InstructionManager im = new InstructionManager(symbolTable);
             BasicBlock newblock = CopyBasicBlock(curBlock);
             im.setCurrentBlock(newblock);
-            int AssemblyPC = 0;
-
+            
 
             Instruction curInstr = curBlock.firstInstruction;
             Result resA, resB;
@@ -78,7 +79,7 @@ namespace ScannerParser {
                 bool changeSecondOper = swapPairs.ContainsKey(curInstr.secondOperandSSAVal);
 
                 AssemblyPC++;
-                Assert(AssemblyPC == curInstr.instructionNum);
+             //   System.Diagnostics.Debug.Assert(AssemblyPC == curInstr.instructionNum);
                 switch (curInstr.opCode) {
                     // Assignment statement
                     case Token.BECOMES:
