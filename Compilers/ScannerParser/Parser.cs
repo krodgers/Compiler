@@ -1859,6 +1859,10 @@ namespace ScannerParser {
             }
         }
 
+        public List<Symbol> ExportSymbolTable() {
+            return symbolTable;
+        }
+
 
     }
 }

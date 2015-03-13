@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ScannerParser {
     public class Instruction {
-        public enum OperandType {SSA_VAL, CONSTANT, REG, VAR, IDENT, BRANCH, ERROR, PHI_OPERAND}
+        public enum OperandType {SSA_VAL, CONSTANT, REG, VAR, IDENT, BRANCH, ERROR, PHI_OPERAND, ARRAY}
         //public Result myResult;
         public int instructionNum { private set;  get; }
         public Instruction[] neededInstr; // instructions whose values this instruction needs

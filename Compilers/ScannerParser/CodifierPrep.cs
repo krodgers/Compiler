@@ -15,28 +15,65 @@ namespace ScannerParser {
         ////////////////////////////////////////////////////////////
         // Optimization things 
         //////////////////////////////////////////////////////////////
-        public static void PerformCopyPropagation(BasicBlock start) {
+        public static Queue<BasicBlock> PerformCopyPropagation(BasicBlock start, List<Symbol> symTable) {
+            Queue<BasicBlock> blocks = Utilities.TraverseCFG(start);
+            Queue<BasicBlock> blocksPropped = new Queue<BasicBlock>();
 
+            Dictionary<int, int>[] blockNum_swapPairs = new Dictionary<int, int>[blocks.Count + 1];
+            Dictionary<string, int>[] blockNum_variVals = new Dictionary<string, int>[blocks.Count + 1];
+            
+            Dictionary<string, int> variVals = new Dictionary<string, int>();
+            Dictionary<int, int> pairsToSwap = new Dictionary<int, int>();
+
+            blockNum_swapPairs[0] = pairsToSwap;
+            blockNum_variVals[0] = variVals;
+
+            while (blocks.Count > 0) {
+                BasicBlock currBlock = blocks.Dequeue();
+
+                if (currBlock.dominatingBlock != null) {
+                    variVals = blockNum_variVals[currBlock.dominatingBlock.blockNum];
+                    pairsToSwap = blockNum_swapPairs[currBlock.dominatingBlock.blockNum];
+                } else {
+                      variVals = new Dictionary<string, int>();
+                      pairsToSwap = new Dictionary<int, int>();
+                }
+                BasicBlock res = Propagate(currBlock, symTable, ref variVals, ref pairsToSwap);
+
+                blocksPropped.Enqueue(res);
+                blockNum_swapPairs[currBlock.blockNum] = pairsToSwap;
+                blockNum_variVals[currBlock.blockNum] = variVals;
+
+            }
+
+
+
+
+
+            return blocksPropped;
         }
 
         // returns a basicblock with values copy propaagted
         // swapPairs -- the pairs that should be swapped, e.g (1) --> new_Instruction -- should be initialized with dominating blocks' output
         // variableValues --> maps variable names to their instructions ---- -- should be initialized with dominating blocks' output
         //                     SSA Value of 0 means it hasn't got one
-
-        private static BasicBlock Propagate(BasicBlock curBlock, ref Dictionary<string, int> variableValues, ref Dictionary<int, int> swapPairs) {
-            InstructionManager im = new InstructionManager();
+        // TODO:: Constant propagation
+        // TODO:: Reset variable values
+        private static BasicBlock Propagate(BasicBlock curBlock, List<Symbol> symbolTable, ref Dictionary<string, int> variableValues, ref Dictionary<int, int> swapPairs) {
+            InstructionManager im = new InstructionManager(symbolTable);
             BasicBlock newblock = CopyBasicBlock(curBlock);
             Dictionary<int, Result> lineNumToResult = new Dictionary<int, Result>(); // maps ssa values --> results
             im.setCurrentBlock(newblock);
-            int AssemblyPC = 0;
+            int AssemblyPC = 1;
 
 
             Instruction curInstr = curBlock.firstInstruction;
+            Result resA, resB;
             while (curInstr != null) {
                 // Look up to see if the opearands need to be replaced
                 bool changeFirstOper = swapPairs.ContainsKey(curInstr.firstOperandSSAVal);
                 bool changeSecondOper = swapPairs.ContainsKey(curInstr.secondOperandSSAVal);
+
 
                 switch (curInstr.opCode) {
                     // Assignment statement
@@ -44,6 +81,8 @@ namespace ScannerParser {
                         Result valueResult = changeFirstOper ? lineNumToResult[swapPairs[curInstr.firstOperandSSAVal]] : ReconstructResult(curInstr.firstOperandType, curInstr.firstOperand, AssemblyPC); // the assignment value
                         lineNumToResult.Add(AssemblyPC, valueResult); // store the pair  (currLine) --> assignValue
                         int currentValue;
+                        Result variableResult = ReconstructResult(Instruction.OperandType.VAR, curInstr.secondOperand, AssemblyPC);
+                   
                         // remove any swap values that depended on the value of this variable
                         if (variableValues.TryGetValue(curInstr.secondOperand, out currentValue)) {
                             swapPairs.Remove(currentValue);
@@ -51,15 +90,25 @@ namespace ScannerParser {
                                 if (pair.Value == AssemblyPC)
                                     swapPairs.Remove(pair.Key);
                             }
+                        } else {
+                            variableValues.Add(variableResult.GetValue(), valueResult.lineNumber);
                         }
-                        Result variableResult = ReconstructResult(Instruction.OperandType.VAR, curInstr.secondOperand, AssemblyPC);
+                        swapPairs.Add(AssemblyPC, valueResult.lineNumber);
                         PutInstruction(curInstr.opCode, valueResult, variableResult, AssemblyPC, ref im);
                         break;
                     case Token.RETURN:
                     case Token.END:
+                        resA= changeFirstOper ? lineNumToResult[swapPairs[curInstr.firstOperandSSAVal]] : ReconstructResult(curInstr.firstOperandType, curInstr.firstOperand, AssemblyPC);
+                        PutInstruction(curInstr.opCode, resA, null, AssemblyPC, ref im);
                         break;
                     default:
-                        break;
+                         resA = changeFirstOper ? lineNumToResult[swapPairs[curInstr.firstOperandSSAVal]] : ReconstructResult(curInstr.firstOperandType, curInstr.firstOperand, AssemblyPC);
+                         resB = changeSecondOper ? lineNumToResult[swapPairs[curInstr.secondOperandSSAVal]] : ReconstructResult(curInstr.secondOperandType, curInstr.secondOperand, AssemblyPC);
+                      //  if (changeFirstOper || changeSecondOper)
+                            PutInstruction(curInstr.opCode, resA, resB, AssemblyPC, ref im);
+                        //else
+
+                            break;
                 }
 
                 AssemblyPC++;
@@ -83,86 +132,86 @@ namespace ScannerParser {
         }
      
 
-        private static BasicBlock old(BasicBlock curBlock, ref Dictionary<string, int> variableValues, ref Dictionary<int, int> swapPairs) {
-            InstructionManager im = new InstructionManager();
-            BasicBlock newblock = CopyBasicBlock(curBlock);
-            Dictionary<int, Result> ssaValToResult = new Dictionary<int, Result>(); // maps ssa values --> results
-            im.setCurrentBlock(newblock);
+//        private static BasicBlock old(BasicBlock curBlock, ref Dictionary<string, int> variableValues, ref Dictionary<int, int> swapPairs) {
+//            InstructionManager im = new InstructionManager();
+//            BasicBlock newblock = CopyBasicBlock(curBlock);
+//            Dictionary<int, Result> ssaValToResult = new Dictionary<int, Result>(); // maps ssa values --> results
+//            im.setCurrentBlock(newblock);
           
 
 
-            Instruction currInstr = curBlock.firstInstruction;
-            int currInstrNum = 1;
-            Result first, second;
+//            Instruction currInstr = curBlock.firstInstruction;
+//            int currInstrNum = 1;
+//            Result first, second;
 
-            while (currInstr != null) {
-                first = second = null;
-                // check swapPairs
-                if (currInstr.firstOperandType == Instruction.OperandType.SSA_VAL && swapPairs.ContainsKey(currInstr.firstOperandSSAVal)) {
-                    // need to swap out the operands
-                    first = ssaValToResult[currInstr.firstOperandSSAVal];
-                }
-                if (currInstr.secondOperandType == Instruction.OperandType.SSA_VAL && swapPairs.ContainsKey(currInstr.secondOperandSSAVal)) {
-                    // need to swap out the opearnds
-                    second = ssaValToResult[currInstr.secondOperandSSAVal];
-                }
-
-
-                if (currInstr.opCode == Token.BECOMES) {
-                    string variableName = currInstr.secondOperand;
-                    string value = currInstr.firstOperand;
-                    int ssaval = Int32.Parse(value);
+//            while (currInstr != null) {
+//                first = second = null;
+//                // check swapPairs
+//                if (currInstr.firstOperandType == Instruction.OperandType.SSA_VAL && swapPairs.ContainsKey(currInstr.firstOperandSSAVal)) {
+//                    // need to swap out the operands
+//                    first = ssaValToResult[currInstr.firstOperandSSAVal];
+//                }
+//                if (currInstr.secondOperandType == Instruction.OperandType.SSA_VAL && swapPairs.ContainsKey(currInstr.secondOperandSSAVal)) {
+//                    // need to swap out the opearnds
+//                    second = ssaValToResult[currInstr.secondOperandSSAVal];
+//                }
 
 
-                    // update variableValues
-                    int bootedResult;
-                    if (variableValues.TryGetValue(variableName, out bootedResult)) {
-                        // successfully got value 
-                        // remove all pairs containing bootedResult
-                        foreach (KeyValuePair<int, int> pair in swapPairs) {
-                            if (pair.Value == bootedResult || pair.Key == bootedResult)
-                                swapPairs.Remove(pair.Key);
-                        }
-                    } else {
-                        // map this variable to the instruction associated with the value
-                        if (currInstr.firstOperandType == Instruction.OperandType.SSA_VAL) {
-                            variableValues.Add(variableName, ssaval);
+//                if (currInstr.opCode == Token.BECOMES) {
+//                    string variableName = currInstr.secondOperand;
+//                    string value = currInstr.firstOperand;
+//                    int ssaval = Int32.Parse(value);
 
-                        } else if (currInstr.firstOperandType == Instruction.OperandType.CONSTANT) {
-                            // Add a constant instruction ... ? 
 
-                        } else {
-                            Console.WriteLine("Got an assignment instruction, but don't know how to parse it");
-                            Console.WriteLine(currInstr);
-                            Console.ReadLine();
-                        }
-                    }
+//                    // update variableValues
+//                    int bootedResult;
+//                    if (variableValues.TryGetValue(variableName, out bootedResult)) {
+//                        // successfully got value 
+//                        // remove all pairs containing bootedResult
+//                        foreach (KeyValuePair<int, int> pair in swapPairs) {
+//                            if (pair.Value == bootedResult || pair.Key == bootedResult)
+//                                swapPairs.Remove(pair.Key);
+//                        }
+//                    } else {
+//                        // map this variable to the instruction associated with the value
+//                        if (currInstr.firstOperandType == Instruction.OperandType.SSA_VAL) {
+//                            variableValues.Add(variableName, ssaval);
 
-                    Result resA, resB;
-                    resA = first == null ? null : first;
-                    resB = second == null ? null : second;
-//                    ReconstructResult(currInstr, out resA, out resB);
+//                        } else if (currInstr.firstOperandType == Instruction.OperandType.CONSTANT) {
+//                            // Add a constant instruction ... ? 
+
+//                        } else {
+//                            Console.WriteLine("Got an assignment instruction, but don't know how to parse it");
+//                            Console.WriteLine(currInstr);
+//                            Console.ReadLine();
+//                        }
+//                    }
+
+//                    Result resA, resB;
+//                    resA = first == null ? null : first;
+//                    resB = second == null ? null : second;
+////                    ReconstructResult(currInstr, out resA, out resB);
 
                   
-                }
-                currInstr = currInstr.next;
-                currInstrNum++;
-            }
+//                }
+//                currInstr = currInstr.next;
+//                currInstrNum++;
+//            }
 
-            // for instruction i in block
-            // if instr is assignment ( var = val)
-            //      check if 
-            //       mark var has having val variable table
-            //       mark the result's SSAVal as needing to be changed to val
-            //       update instruction
-            // if instr is op A B
-            //      check if A's SSAVAl is in table of change pairs
-            //      check if B's SSAVal is in table of change pairs
-            //      check if result's SSA value is in any change pairs -- if so, remove them
-            return newblock;
+//            // for instruction i in block
+//            // if instr is assignment ( var = val)
+//            //      check if 
+//            //       mark var has having val variable table
+//            //       mark the result's SSAVal as needing to be changed to val
+//            //       update instruction
+//            // if instr is op A B
+//            //      check if A's SSAVAl is in table of change pairs
+//            //      check if B's SSAVal is in table of change pairs
+//            //      check if result's SSA value is in any change pairs -- if so, remove them
+//            return newblock;
 
 
-        }
+//        }
 
         private static void PutInstruction(Token opcode, Result resA, Result resB, int lineNumber, ref InstructionManager im) {
             // Add updated instruction to newblock
@@ -174,8 +223,10 @@ namespace ScannerParser {
                     im.PutBasicInstruction(opcode, resA, resB, lineNumber);
                     break;
                 case Token.LOAD:
-                case Token.BECOMES:
                     im.PutLoadInstruction(resA, lineNumber);
+                    break;
+                case Token.BECOMES:
+                    im.PutBasicInstruction(Token.BECOMES, resA, resB, lineNumber);
                     break;
                 case Token.EQL:
                 case Token.NEQ:
@@ -207,7 +258,7 @@ namespace ScannerParser {
                     im.PutBasicInstruction(opcode, resA, resB, lineNumber);
                     break;
             }
-}
+        }
 
         private static Result ReconstructResult(Instruction.OperandType? type, string operand, int ssaval) {
             Result res = null;
@@ -243,6 +294,7 @@ namespace ScannerParser {
                 return Kind.ARR;
 
             switch (type) {
+                case Instruction.OperandType.SSA_VAL:
                 case Instruction.OperandType.REG:
                     return Kind.REG;
                 case Instruction.OperandType.VAR:
@@ -251,6 +303,8 @@ namespace ScannerParser {
                     return Kind.CONST;
                 case Instruction.OperandType.BRANCH:
                     return Kind.BRA;
+                case Instruction.OperandType.ARRAY:
+                    return Kind.ARR;
                 default:
                     Console.WriteLine("Should not have gotten here");
                     return Kind.ARR; // have to return something..... :(
@@ -267,7 +321,7 @@ namespace ScannerParser {
                 case Kind.BRA:
                     return Instruction.OperandType.BRANCH;
                 case Kind.ARR:
-                    return Instruction.OperandType.VAR;
+                    return Instruction.OperandType.ARRAY;
                 default:
                     Console.WriteLine("Should not have gotten here");
                     return Instruction.OperandType.ERROR;

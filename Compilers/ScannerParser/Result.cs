@@ -97,6 +97,9 @@ namespace ScannerParser {
             } else if (myType == Kind.ARR) {
                 type = myType;
                 arrBase = myValue;
+            } else if (myType == Kind.BRA) {
+                type = Kind.BRA;
+                valueS = myValue;
             }
             else {
                 Console.WriteLine("WARNING: Initializing Result with wrong value type: Expectiong CONST, VAR, ARR, or REG");
@@ -146,6 +149,9 @@ namespace ScannerParser {
                     break;
                 case Kind.ARR:
                     s = arrBase;
+                    break;
+                case Kind.BRA:
+                    s = valueS;
                     break;
             }
             return s;
