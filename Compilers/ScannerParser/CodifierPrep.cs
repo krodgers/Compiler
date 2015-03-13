@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 namespace ScannerParser {
     // Collection of functions to get code ready to be codified
     public class CodifierPrep {
+
+        private static Dictionary<int, Result> lineNumToResult; 
+
         // Constructor because C# is dumb
         public CodifierPrep() {
 
@@ -16,7 +19,7 @@ namespace ScannerParser {
         // Optimization things 
         //////////////////////////////////////////////////////////////
         public static Queue<BasicBlock> PerformCopyPropagation(BasicBlock start, List<Symbol> symTable) {
-            Queue<BasicBlock> blocks = Utilities.TraverseCFG(start);
+            Queue<BasicBlock> blocks = Utilities.TraverseCFG(ref start);
             Queue<BasicBlock> blocksPropped = new Queue<BasicBlock>();
 
             Dictionary<int, int>[] blockNum_swapPairs = new Dictionary<int, int>[blocks.Count + 1];
@@ -24,6 +27,7 @@ namespace ScannerParser {
             
             Dictionary<string, int> variVals = new Dictionary<string, int>();
             Dictionary<int, int> pairsToSwap = new Dictionary<int, int>();
+            lineNumToResult = new Dictionary<int, Result>(); // maps ssa values --> results
 
             blockNum_swapPairs[0] = pairsToSwap;
             blockNum_variVals[0] = variVals;
@@ -62,9 +66,8 @@ namespace ScannerParser {
         private static BasicBlock Propagate(BasicBlock curBlock, List<Symbol> symbolTable, ref Dictionary<string, int> variableValues, ref Dictionary<int, int> swapPairs) {
             InstructionManager im = new InstructionManager(symbolTable);
             BasicBlock newblock = CopyBasicBlock(curBlock);
-            Dictionary<int, Result> lineNumToResult = new Dictionary<int, Result>(); // maps ssa values --> results
             im.setCurrentBlock(newblock);
-            int AssemblyPC = 1;
+            int AssemblyPC = 0;
 
 
             Instruction curInstr = curBlock.firstInstruction;
@@ -74,12 +77,14 @@ namespace ScannerParser {
                 bool changeFirstOper = swapPairs.ContainsKey(curInstr.firstOperandSSAVal);
                 bool changeSecondOper = swapPairs.ContainsKey(curInstr.secondOperandSSAVal);
 
-
+                AssemblyPC++;
+                Assert(AssemblyPC == curInstr.instructionNum);
                 switch (curInstr.opCode) {
                     // Assignment statement
                     case Token.BECOMES:
                         Result valueResult = changeFirstOper ? lineNumToResult[swapPairs[curInstr.firstOperandSSAVal]] : ReconstructResult(curInstr.firstOperandType, curInstr.firstOperand, AssemblyPC); // the assignment value
-                        lineNumToResult.Add(AssemblyPC, valueResult); // store the pair  (currLine) --> assignValue
+                        if (!lineNumToResult.ContainsKey(AssemblyPC))
+                            lineNumToResult.Add(AssemblyPC, valueResult); // store the pair  (currLine) --> assignValue
                         int currentValue;
                         Result variableResult = ReconstructResult(Instruction.OperandType.VAR, curInstr.secondOperand, AssemblyPC);
                    
@@ -106,12 +111,13 @@ namespace ScannerParser {
                          resB = changeSecondOper ? lineNumToResult[swapPairs[curInstr.secondOperandSSAVal]] : ReconstructResult(curInstr.secondOperandType, curInstr.secondOperand, AssemblyPC);
                       //  if (changeFirstOper || changeSecondOper)
                             PutInstruction(curInstr.opCode, resA, resB, AssemblyPC, ref im);
+                            if (!lineNumToResult.ContainsKey(AssemblyPC))
+                                lineNumToResult.Add(AssemblyPC, curInstr.myResult);
                         //else
 
                             break;
                 }
 
-                AssemblyPC++;
                 curInstr = curInstr.next;
 
                 
@@ -130,88 +136,8 @@ namespace ScannerParser {
             //      check if B's SSAVal is in table of change pairs
             //      check if result's SSA value is in any change pairs -- if so, remove them
         }
-     
-
-//        private static BasicBlock old(BasicBlock curBlock, ref Dictionary<string, int> variableValues, ref Dictionary<int, int> swapPairs) {
-//            InstructionManager im = new InstructionManager();
-//            BasicBlock newblock = CopyBasicBlock(curBlock);
-//            Dictionary<int, Result> ssaValToResult = new Dictionary<int, Result>(); // maps ssa values --> results
-//            im.setCurrentBlock(newblock);
-          
 
 
-//            Instruction currInstr = curBlock.firstInstruction;
-//            int currInstrNum = 1;
-//            Result first, second;
-
-//            while (currInstr != null) {
-//                first = second = null;
-//                // check swapPairs
-//                if (currInstr.firstOperandType == Instruction.OperandType.SSA_VAL && swapPairs.ContainsKey(currInstr.firstOperandSSAVal)) {
-//                    // need to swap out the operands
-//                    first = ssaValToResult[currInstr.firstOperandSSAVal];
-//                }
-//                if (currInstr.secondOperandType == Instruction.OperandType.SSA_VAL && swapPairs.ContainsKey(currInstr.secondOperandSSAVal)) {
-//                    // need to swap out the opearnds
-//                    second = ssaValToResult[currInstr.secondOperandSSAVal];
-//                }
-
-
-//                if (currInstr.opCode == Token.BECOMES) {
-//                    string variableName = currInstr.secondOperand;
-//                    string value = currInstr.firstOperand;
-//                    int ssaval = Int32.Parse(value);
-
-
-//                    // update variableValues
-//                    int bootedResult;
-//                    if (variableValues.TryGetValue(variableName, out bootedResult)) {
-//                        // successfully got value 
-//                        // remove all pairs containing bootedResult
-//                        foreach (KeyValuePair<int, int> pair in swapPairs) {
-//                            if (pair.Value == bootedResult || pair.Key == bootedResult)
-//                                swapPairs.Remove(pair.Key);
-//                        }
-//                    } else {
-//                        // map this variable to the instruction associated with the value
-//                        if (currInstr.firstOperandType == Instruction.OperandType.SSA_VAL) {
-//                            variableValues.Add(variableName, ssaval);
-
-//                        } else if (currInstr.firstOperandType == Instruction.OperandType.CONSTANT) {
-//                            // Add a constant instruction ... ? 
-
-//                        } else {
-//                            Console.WriteLine("Got an assignment instruction, but don't know how to parse it");
-//                            Console.WriteLine(currInstr);
-//                            Console.ReadLine();
-//                        }
-//                    }
-
-//                    Result resA, resB;
-//                    resA = first == null ? null : first;
-//                    resB = second == null ? null : second;
-////                    ReconstructResult(currInstr, out resA, out resB);
-
-                  
-//                }
-//                currInstr = currInstr.next;
-//                currInstrNum++;
-//            }
-
-//            // for instruction i in block
-//            // if instr is assignment ( var = val)
-//            //      check if 
-//            //       mark var has having val variable table
-//            //       mark the result's SSAVal as needing to be changed to val
-//            //       update instruction
-//            // if instr is op A B
-//            //      check if A's SSAVAl is in table of change pairs
-//            //      check if B's SSAVal is in table of change pairs
-//            //      check if result's SSA value is in any change pairs -- if so, remove them
-//            return newblock;
-
-
-//        }
 
         private static void PutInstruction(Token opcode, Result resA, Result resB, int lineNumber, ref InstructionManager im) {
             // Add updated instruction to newblock

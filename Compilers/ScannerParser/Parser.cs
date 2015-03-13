@@ -122,7 +122,21 @@ namespace ScannerParser {
             //HandleToken(); TODO this needs to be moved somewhere else because causes problems in next
         }
 
-        public BasicBlock StartFirstPass() {
+        public BasicBlock StartFirstPass(ref BasicBlock start)  {
+
+            Main();
+
+            dotty = new Dotifier(flowGraphNodes);
+            dotty.WriteAllBlocksToDot("if_while_test", curBasicBlock.blockNum);
+            dotty.WriteDominatorTree("if_while_test");
+
+            start = entryBlock;
+
+            return entryBlock;
+
+        }
+
+  public BasicBlock StartFirstPass() {
 
             Main();
 
@@ -131,6 +145,7 @@ namespace ScannerParser {
             dotty.WriteDominatorTree("if_while_test");
 
             return entryBlock;
+
         }
 
 
@@ -218,6 +233,8 @@ namespace ScannerParser {
                         oldAssemblyPC = AssemblyPC;
                         //instructionManager.PutLoadInstruction(res, AssemblyPC);
                         //  res = SSAWriter.LoadVariable(res, AssemblyPC);
+//                        instructionManager.GetInstruction(AssemblyPC).myResult = res;
+
                         res = LoadIfNeeded(res);
                         AssemblyPC++;
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
@@ -328,6 +345,8 @@ namespace ScannerParser {
 
 
                                 instructionManager.PutFunctionArgument(currArg, AssemblyPC);
+                        instructionManager.GetInstruction(AssemblyPC).myResult = currArg;
+
                                 SSAWriter.StoreFunctionArgument(currArg, AssemblyPC);
                                 // Set the value of the arguments
                                 int ID = scanner.String2Id(currArg.GetValue());
@@ -354,6 +373,8 @@ namespace ScannerParser {
 
                                     oldAssemblyPC = AssemblyPC;
                                     instructionManager.PutFunctionArgument(currArg, AssemblyPC);
+                                    instructionManager.GetInstruction(AssemblyPC).myResult = currArg;
+
                                     SSAWriter.StoreFunctionArgument(currArg, AssemblyPC);
                                     // Set the value of the arguments
                                     int ID = scanner.String2Id(currArg.GetValue());
@@ -378,6 +399,8 @@ namespace ScannerParser {
                         // branch to function
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutFunctionEntry(res, AssemblyPC);
+                        instructionManager.GetInstruction(AssemblyPC).myResult = res;
+
                         SSAWriter.FunctionEntry(res, AssemblyPC++);
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
 
@@ -456,6 +479,8 @@ namespace ScannerParser {
                     oldAssemblyPC = AssemblyPC;
                     res = new Result(Kind.REG, String.Format("({0})", AssemblyPC));
                     instructionManager.PutBasicInstruction(Token.INPUTNUM, res, new Result(Kind.CONST, ""), AssemblyPC);
+                        instructionManager.GetInstruction(AssemblyPC).myResult = res;
+
                     SSAWriter.sw.WriteLine("{0}: read", AssemblyPC);
                     Console.WriteLine("{0}: read  ", AssemblyPC++);
                     IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
@@ -1002,7 +1027,6 @@ namespace ScannerParser {
 
                     // TODO:: don't update symbol cause it kills everything anyways?
                 } else {
-
                     Result oldVarVal = null;
                     oldAssemblyPC = AssemblyPC;
                     instructionManager.PutBasicInstruction(Token.BECOMES, res2, res1, AssemblyPC);
@@ -1011,6 +1035,7 @@ namespace ScannerParser {
                     int ID = scanner.String2Id(res1.GetValue());
                     if (ID != -1)
                     {
+
                         if (curJoinBlock == null || !curJoinBlock.phiInstructions.ContainsKey(ID))
                             oldVarVal = symbolTable[ID].GetCurrentValue(scopes.Peek());
                         else
@@ -1096,6 +1121,7 @@ namespace ScannerParser {
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         res = SSAWriter.PutArithmeticRegInstruction(Utilities.TokenToInstruction(opCode), newA, newB, AssemblyPC++);
+                        instructionManager.GetInstruction(AssemblyPC-1).myResult = res;
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
@@ -1104,6 +1130,7 @@ namespace ScannerParser {
                         //                        instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         res = SSAWriter.PutCompare("cmp", newA, newB, AssemblyPC++);
+                        instructionManager.GetInstruction(AssemblyPC-1).myResult = res;
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
 
                         // branch
@@ -1122,6 +1149,8 @@ namespace ScannerParser {
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         res = SSAWriter.PutArithmeticImmInstruction(Utilities.TokenToInstruction(opCode), newA, newB, AssemblyPC++);
+                        instructionManager.GetInstruction(AssemblyPC-1).myResult = res;
+
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
@@ -1129,6 +1158,7 @@ namespace ScannerParser {
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         res = SSAWriter.PutCompare("cmp", newA, newB, AssemblyPC++);
+                        instructionManager.GetInstruction(AssemblyPC - 1).myResult = res;
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
 
                         // branch
@@ -1148,13 +1178,15 @@ namespace ScannerParser {
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         res = SSAWriter.PutArithmeticImmInstruction(Utilities.TokenToInstruction(opCode), newA, newB, AssemblyPC++);
-                        IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
+                                                instructionManager.GetInstruction(AssemblyPC-1).myResult = res;
+IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
                         // compare
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         res = SSAWriter.PutCompare("cmp", newA, newB, AssemblyPC++);
+                        instructionManager.GetInstruction(AssemblyPC-1).myResult = res;
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
 
                         // branch
@@ -1176,7 +1208,8 @@ namespace ScannerParser {
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         res = SSAWriter.PutArithmeticRegInstruction(Utilities.TokenToInstruction(opCode), newA, newB, AssemblyPC++);
-                        IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
+                                                instructionManager.GetInstruction(AssemblyPC-1).myResult = res;
+IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
                         // compare
@@ -1203,6 +1236,8 @@ namespace ScannerParser {
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         res = SSAWriter.PutArithmeticRegInstruction(Utilities.TokenToInstruction(opCode), newA, newB, AssemblyPC++);
+                        instructionManager.GetInstruction(AssemblyPC-1).myResult = res;
+
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
@@ -1210,6 +1245,8 @@ namespace ScannerParser {
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         res = SSAWriter.PutCompare("cmp", newA, newB, AssemblyPC++);
+                        instructionManager.GetInstruction(AssemblyPC-1).myResult = res;
+
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
 
                         // branch
@@ -1229,6 +1266,8 @@ namespace ScannerParser {
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         res = SSAWriter.PutArithmeticImmInstruction(Utilities.TokenToInstruction(opCode), newB, newA, AssemblyPC++);
+                        instructionManager.GetInstruction(AssemblyPC-1).myResult = res;
+
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
@@ -1236,6 +1275,8 @@ namespace ScannerParser {
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         res = SSAWriter.PutCompare("cmp", newA, newB, AssemblyPC++);
+                        instructionManager.GetInstruction(AssemblyPC-1).myResult = res;
+
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
 
                         // branch
@@ -1256,6 +1297,8 @@ namespace ScannerParser {
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         res = SSAWriter.PutArithmeticRegInstruction(Utilities.TokenToInstruction(opCode), newA, newB, AssemblyPC++);
+                        instructionManager.GetInstruction(AssemblyPC-1).myResult = res;
+
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
@@ -1282,6 +1325,8 @@ namespace ScannerParser {
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         res = SSAWriter.PutArithmeticImmInstruction(Utilities.TokenToInstruction(opCode), newB, newA, AssemblyPC++);
+                        instructionManager.GetInstruction(AssemblyPC-1).myResult = res;
+
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
                         break;
                     case OpCodeClass.COMPARE:
@@ -1289,6 +1334,8 @@ namespace ScannerParser {
                         oldAssemblyPC = AssemblyPC;
                         instructionManager.PutBasicInstruction(opCode, newA, newB, AssemblyPC);
                         res = SSAWriter.PutCompare("cmp", newA, newB, AssemblyPC++);
+                        instructionManager.GetInstruction(AssemblyPC-1).myResult = res;
+
                         IncrementLoopCounters(oldAssemblyPC, AssemblyPC);
 
                         // branch
@@ -1352,6 +1399,8 @@ namespace ScannerParser {
                     //instructionManager.PutBasicInstruction(Token.MINUS, new Result(Kind.CONST, argSym.stackOffset), new Result(Kind.REG, "$FP"), AssemblyPC);
                     res = new Result(Kind.CONST, (double)0);
                     instructionManager.PutBasicInstruction(Token.BECOMES, res, variableToLoad, AssemblyPC);
+                        instructionManager.GetInstruction(AssemblyPC).myResult = res;
+
                     SSAWriter.PutInstruction("mov", res.GetValue(), variableToLoad.GetValue(), AssemblyPC);
 
                     AssemblyPC++;
@@ -1367,6 +1416,7 @@ namespace ScannerParser {
                     oldAssemblyPC = AssemblyPC;
                     res = SSAWriter.LoadFunctionArgument(offset, variableToLoad, AssemblyPC);
                     instructionManager.PutBasicInstruction(Token.MINUS, new Result(Kind.CONST, argSym.stackOffset), new Result(Kind.REG, "$FP"), AssemblyPC);
+                                            instructionManager.GetInstruction(AssemblyPC).myResult = res;
 
                     AssemblyPC++;
                     instructionManager.PutLoadInstruction(variableToLoad, AssemblyPC);
@@ -1384,6 +1434,8 @@ namespace ScannerParser {
                     //instructionManager.PutBasicInstruction(Token.MINUS, new Result(Kind.CONST, argSym.stackOffset), new Result(Kind.REG, "$FP"), AssemblyPC);
                     res = new Result(Kind.CONST, (double)0);
                     instructionManager.PutBasicInstruction(Token.BECOMES, res, variableToLoad, AssemblyPC);
+                        instructionManager.GetInstruction(AssemblyPC).myResult = res;
+
                     SSAWriter.PutInstruction("mov", res.GetValue(), variableToLoad.GetValue(), AssemblyPC);
 
                     AssemblyPC++;
@@ -1401,6 +1453,8 @@ namespace ScannerParser {
 
                 instructionManager.PutLoadArray(res, GetArrayDimensions(res.GetValue()), res.GetArrayIndices(), AssemblyPC);
                 res = SSAWriter.LoadArrayElement(res, GetArrayDimensions(res.GetValue()), res.GetArrayIndices(), AssemblyPC);
+                        instructionManager.GetInstruction(AssemblyPC).myResult = res;
+
                 AssemblyPC = res.lineNumber + 1;
             }
             // 

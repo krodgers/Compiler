@@ -269,7 +269,7 @@ namespace ScannerParser {
         }
 
 
-        public static Queue<BasicBlock> TraverseCFG(BasicBlock start) {
+        public static Queue<BasicBlock> TraverseCFG(ref BasicBlock start) {
             Queue<BasicBlock> CFG = new Queue<BasicBlock>();
 
             Stack<BasicBlock> blocks = new Stack<BasicBlock>();
@@ -301,6 +301,7 @@ namespace ScannerParser {
                 } else {
                     // ?
                     Console.WriteLine("Shouldn't be here...");
+                    curr = null;
                 }
 
             }

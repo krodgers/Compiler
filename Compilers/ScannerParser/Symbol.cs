@@ -39,12 +39,12 @@ namespace ScannerParser {
        
 
         // Returns the last stored value of this symbol in the given scope
-        // returns null if the scope isn't valid or symbol hasn't been given a value
+        // returns constant 0  if the scope isn't valid or symbol hasn't been given a value
         public Result GetCurrentValue(int whichScope) {
             if ((IsGlobal() || IsInScope(whichScope)) && validScopes.ContainsKey(whichScope)) {
                 return validScopes[whichScope];
                 
-            } else {
+            } else  {
                 return null;
             }
 
