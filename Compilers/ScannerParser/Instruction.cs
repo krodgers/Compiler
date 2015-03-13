@@ -8,7 +8,7 @@ namespace ScannerParser {
     public class Instruction {
         public enum OperandType {SSA_VAL, CONSTANT, REG, VAR, IDENT, BRANCH, ERROR, PHI_OPERAND}
         //public Result myResult;
-        public int instructionNum { private set;  get; }
+        public int instructionNum { set;  get; }
         public Instruction[] neededInstr; // instructions whose values this instruction needs
         public List<Instruction> referencesToThisValue;
         public Instruction next;
