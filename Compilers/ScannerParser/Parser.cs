@@ -655,7 +655,7 @@ namespace ScannerParser {
                                     parentsBranchInstruction = parentsBranchInstruction.next;
                                 parentsBranchInstruction.secondOperand = joinBlock.blockNum.ToString();
 
-                                joinBlock.joinPredecessorInstructionCount += trueBlock.instructionCount;
+                                
                                 if (trueBlock.childBlocks.Count == 0) {
                                     trueBlock.childBlocks.Add(joinBlock);
                                     joinBlock.parentBlocks.Add(trueBlock);
@@ -680,8 +680,6 @@ namespace ScannerParser {
                                 }
                             }
                             else {
-                                joinBlock.joinPredecessorInstructionCount += trueBlock.instructionCount;
-                                joinBlock.joinPredecessorInstructionCount += falseBlock.instructionCount;
                                 if (curBasicBlock.childBlocks.Count < 2) {
                                     curBasicBlock.childBlocks.Add(joinBlock);
                                     joinBlock.parentBlocks.Add(curBasicBlock);
