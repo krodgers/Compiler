@@ -51,6 +51,7 @@ namespace ScannerParser {
         private int nextGlobalOffset;
 
         private Stack<BasicBlock> joinBlocks;
+        public Dictionary<int, BasicBlock> joinParentBlocks;
         private Stack<BasicBlock> loopHeaderBlocks;
         private StackList joinBlockListForPhis;
         private int globalNestingLevel;
@@ -91,6 +92,8 @@ namespace ScannerParser {
             trueBlock = falseBlock = joinBlock = null;
             flowGraphNodes = new Dictionary<int, BasicBlock>();
             loopCounters = new List<int>();
+
+            joinParentBlocks = new Dictionary<int, BasicBlock>();
 
 
         }
@@ -501,6 +504,7 @@ namespace ScannerParser {
                         // First create the join block
                         //BasicBlock joinBlock = new BasicBlock(curBasicBlockNum++);
 
+
                         bool elseOccurred = false;
                         BasicBlock joinBlock = new BasicBlock(nextBBid++);
                         joinBlock.blockType = BasicBlock.BlockType.JOIN;
@@ -510,6 +514,7 @@ namespace ScannerParser {
                         joinBlock.parentBlocks = new List<BasicBlock>();
                         joinBlock.nestingLevel = globalNestingLevel;
                         joinBlock.dominatingBlock = curBasicBlock;
+                        joinParentBlocks[joinBlock.blockNum] = curBasicBlock;
                         curBasicBlock.blocksIDominate.Add(joinBlock);
                         joinBlocks.Push(joinBlock);
                         joinBlockListForPhis.Push(joinBlock);
@@ -562,7 +567,8 @@ namespace ScannerParser {
                             // Restore all of the original values for the variables that
                             // were modified in the true branch
 
-                            foreach (KeyValuePair<string, PhiInstruction> phi in curJoinBlock.phiInstructions) {
+                            foreach (KeyValuePair<int, PhiInstruction> phi in curJoinBlock.phiInstructions) {
+
                                 UpdateSymbol(symbolTable[phi.Value.symTableID], phi.Value.originalVarVal);
                             }
 
@@ -710,21 +716,25 @@ namespace ScannerParser {
                             instructionManager.setCurrentBlock(curBasicBlock);
                             curBasicBlock.scopeNumber = scopes.Peek();
 
+
+                            // Get rid of duplicate phis
+                            instructionManager.RemoveUnnecessaryPhis(curBasicBlock, ref AssemblyPC);
+
+
                             // Commit all of the phis
                             if (joinBlockListForPhis.GetOuterJoin() != null) {
                                 Dictionary<int, PhiInstruction> phisToCommit =
                                     instructionManager.CommitOuterPhi(ref AssemblyPC, curJoinBlock,
                                         joinBlockListForPhis.GetOuterJoin());
 
-                                foreach (KeyValuePair<string, PhiInstruction> phi in curJoinBlock.phiInstructions) {
+                                foreach (KeyValuePair<int, PhiInstruction> phi in curJoinBlock.phiInstructions) {
                                     UpdateSymbol(symbolTable[phi.Value.symTableID],
                                         new Result(Kind.REG, String.Format("({0})", phi.Value.instructionNum)));
                                 }
 
-                                AssemblyPC++;
                             }
                             else {
-                                foreach (KeyValuePair<string, PhiInstruction> phi in curJoinBlock.phiInstructions) {
+                                foreach (KeyValuePair<int, PhiInstruction> phi in curJoinBlock.phiInstructions) {
                                     UpdateSymbol(symbolTable[phi.Value.symTableID],
                                         new Result(Kind.REG, String.Format("({0})", phi.Value.instructionNum)));
                                 }
@@ -882,7 +892,7 @@ namespace ScannerParser {
 
                 // Update all of the values so that the next instructions reference the
                 // new phi values
-                foreach (KeyValuePair<string, PhiInstruction> phi in loopHeaderBlock.phiInstructions) {
+                foreach (KeyValuePair<int, PhiInstruction> phi in loopHeaderBlock.phiInstructions) {
                     UpdateSymbol(symbolTable[phi.Value.symTableID],
                         new Result(Kind.REG, String.Format("({0})", phi.Value.instructionNum)));
                 }
@@ -1001,7 +1011,10 @@ namespace ScannerParser {
                     int ID = scanner.String2Id(res1.GetValue());
                     if (ID != -1)
                     {
-                        oldVarVal = symbolTable[ID].GetCurrentValue(scopes.Peek());
+                        if (curJoinBlock == null || !curJoinBlock.phiInstructions.ContainsKey(ID))
+                            oldVarVal = symbolTable[ID].GetCurrentValue(scopes.Peek());
+                        else
+                            oldVarVal = curJoinBlock.phiInstructions[ID].originalVarVal;
                         UpdateSymbol(symbolTable[ID], null); // log the line number, current result, etc
                     }
                     AssemblyPC++;
@@ -1013,15 +1026,16 @@ namespace ScannerParser {
 
                         switch (curJoinBlock.blockType) {
                             case BasicBlock.BlockType.LOOP_HEADER:
-                                if (!curJoinBlock.phiInstructions.ContainsKey(symbolName)) {
-                                    instructionManager.PutPhiInstruction(AssemblyPC++, curJoinBlock,
+                                if (!curJoinBlock.phiInstructions.ContainsKey(ID)) {
+                                    instructionManager.PutPhiInstruction(AssemblyPC++, curJoinBlock, joinParentBlocks,
                                         scanner.String2Id(symbolName), oldVarVal, symbolName);
 
                                     Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
                                     //Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
                                 }
                                 else {
-                                    instructionManager.UpdatePhiInstruction(symbolName, curJoinBlock);
+                                    instructionManager.UpdatePhiInstruction(ID, curJoinBlock);
+
                                     Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
                                     //Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
                                 }
@@ -1030,46 +1044,26 @@ namespace ScannerParser {
                                 switch (curBasicBlock.blockType) {
                                     case BasicBlock.BlockType.TRUE:
                                         // todo, update true and false blocks to store the ssa val
-                                        if (!curJoinBlock.phiInstructions.ContainsKey(symbolName)) {
+
 
                                             // There is not currently a phi instruction for the variable
                                             // in the current join block, create it
-                                            instructionManager.PutPhiInstruction(AssemblyPC++, curJoinBlock,
+                                            instructionManager.PutPhiInstruction(AssemblyPC++, curJoinBlock, joinParentBlocks,
                                                 scanner.String2Id(symbolName), oldVarVal, symbolName);
 
                                             Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
                                             //Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
-                                        }
-                                        else {
-                                            // A phi instruction for this variable already exists, so we need to
-                                            // modify the second operand to reflect the new value
 
-                                            instructionManager.UpdatePhiInstruction(symbolName, curJoinBlock);
-
-                                            Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
-                                            //Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
-                                        }
                                         break;
                                     case BasicBlock.BlockType.FALSE:
-                                        if (!curJoinBlock.phiInstructions.ContainsKey(symbolName)) {
-                                            // There is not currently a phi instruction for the variable
-                                            // in the current join block, create it
 
-                                            instructionManager.PutPhiInstruction(AssemblyPC++, curJoinBlock,
+                                            instructionManager.PutPhiInstruction(AssemblyPC++, curJoinBlock, joinParentBlocks,
                                                 scanner.String2Id(symbolName), oldVarVal, symbolName);
 
                                             Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
                                             //Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
-                                        }
-                                        else {
-                                            // A phi instruction for this variable already exists, so we need to
-                                            // modify the first operand to reflect the new value
 
-                                            instructionManager.UpdatePhiInstruction(symbolName, curJoinBlock);
-
-                                            Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
-                                            //Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
-                                        }
+                                        
                                         break;
                                 }
                                 break;
