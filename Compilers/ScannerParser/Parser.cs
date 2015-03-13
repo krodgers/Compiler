@@ -51,7 +51,7 @@ namespace ScannerParser {
         private int nextGlobalOffset;
 
         private Stack<BasicBlock> joinBlocks;
-        public Dictionary<int, BasicBlock> joinParentBlocks;
+        public Dictionary<int, BasicBlock> joinMatches;
         private Stack<BasicBlock> loopHeaderBlocks;
         private StackList joinBlockListForPhis;
         private int globalNestingLevel;
@@ -93,7 +93,8 @@ namespace ScannerParser {
             flowGraphNodes = new Dictionary<int, BasicBlock>();
             loopCounters = new List<int>();
 
-            joinParentBlocks = new Dictionary<int, BasicBlock>();
+            joinMatches = new Dictionary<int, BasicBlock>();
+            instructionManager.joinMatches = joinMatches;
 
 
         }
@@ -539,7 +540,7 @@ namespace ScannerParser {
                         joinBlock.parentBlocks = new List<BasicBlock>();
                         joinBlock.nestingLevel = globalNestingLevel;
                         joinBlock.dominatingBlock = curBasicBlock;
-                        joinParentBlocks[joinBlock.blockNum] = curBasicBlock;
+                        joinMatches[joinBlock.blockNum] = curBasicBlock;
                         curBasicBlock.blocksIDominate.Add(joinBlock);
                         joinBlocks.Push(joinBlock);
                         joinBlockListForPhis.Push(joinBlock);
@@ -585,40 +586,6 @@ namespace ScannerParser {
 
                         curBasicBlock = parentBlocks.Pop();
                         instructionManager.setCurrentBlock(curBasicBlock);
-
-                        if (curJoinBlock.firstInstruction != null && curJoinBlock.firstInstruction.opCode == Token.PHI)
-                        {
-                            Dictionary<int, PhiInstruction> phisToMark = new Dictionary<int, PhiInstruction>();
-                            PhiInstruction phis = (PhiInstruction) curJoinBlock.firstInstruction;
-                            while (phis.next != null)
-                            {
-                                if (phisToMark.ContainsKey(phis.symTableID))
-                                {
-                                    phisToMark[phis.symTableID].useMarker = false;
-                                    phisToMark[phis.symTableID] = phis;
-                                    phis.useMarker = true;
-                                    curJoinBlock.lastMarkedInstruction = phis.instructionNum;
-                                }
-                                else
-                                {
-                                    phisToMark[phis.symTableID] = phis;
-                                    phis.useMarker = true;
-                                }
-                                
-                                phis = (PhiInstruction) phis.next;
-                            }
-                            if (phisToMark.ContainsKey(phis.symTableID)) {
-                                phisToMark[phis.symTableID].useMarker = false;
-                                phisToMark[phis.symTableID] = phis;
-                                phis.useMarker = true;
-                                curJoinBlock.lastMarkedInstruction = phis.instructionNum;
-                            }
-                            else {
-                                phisToMark[phis.symTableID] = phis;
-                                phis.useMarker = true;
-                            }
-                            curJoinBlock.sideOnePhis = phisToMark;
-                        }
 
                         BasicBlock falseBlock = null;
                         if (scannerSym == Token.ELSE) {
@@ -675,46 +642,6 @@ namespace ScannerParser {
                             curBasicBlock = parentBlocks.Pop();
                             instructionManager.setCurrentBlock(curBasicBlock);
                             elseOccurred = true;
-
-                            if (curJoinBlock.firstInstruction != null && curJoinBlock.firstInstruction.opCode == Token.PHI) {
-                                Dictionary<int, PhiInstruction> phisToMark = new Dictionary<int, PhiInstruction>();
-
-                                PhiInstruction phis = (PhiInstruction) curJoinBlock.firstInstruction;
-                                if (curJoinBlock.lastMarkedInstruction != 0) {
-                                    while (phis.instructionNum != curJoinBlock.lastMarkedInstruction)
-                                        phis = (PhiInstruction)phis.next;
-                                    phis = (PhiInstruction)phis.next;
-                                }
-                                else {
-                                    phis = (PhiInstruction) curJoinBlock.firstInstruction;
-                                }
-
-                                while (phis.next != null) {
-                                    if (phisToMark.ContainsKey(phis.symTableID)) {
-                                        phisToMark[phis.symTableID].useMarker = false;
-                                        phisToMark[phis.symTableID] = phis;
-                                        phis.useMarker = true;
-                                        curJoinBlock.lastMarkedInstruction = phis.instructionNum;
-                                    }
-                                    else {
-                                        phisToMark[phis.symTableID] = phis;
-                                        phis.useMarker = true;
-                                    }
-
-                                    phis = (PhiInstruction)phis.next;
-                                }
-                                if (phisToMark.ContainsKey(phis.symTableID)) {
-                                    phisToMark[phis.symTableID].useMarker = false;
-                                    phisToMark[phis.symTableID] = phis;
-                                    phis.useMarker = true;
-                                    curJoinBlock.lastMarkedInstruction = phis.instructionNum;
-                                }
-                                else {
-                                    phisToMark[phis.symTableID] = phis;
-                                    phis.useMarker = true;
-                                }
-                                curJoinBlock.sideTwoPhis = phisToMark;
-                            }
                         }
                         if (scannerSym == Token.FI) {
                             if (!elseOccurred) {
@@ -809,17 +736,9 @@ namespace ScannerParser {
                                     instructionManager.setCurrentBlock(curBasicBlock);
                                 }
                             }
-                            curBasicBlock.instructionCount += joinBlock.joinPredecessorInstructionCount;
-                            joinBlock.joinPredecessorInstructionCount = curBasicBlock.instructionCount;
                             curBasicBlock = joinBlock;
                             instructionManager.setCurrentBlock(curBasicBlock);
                             curBasicBlock.scopeNumber = scopes.Peek();
-
-
-                            // Resolve all of the phis
-                            var finalPhis = instructionManager.ResolvePhis(curJoinBlock, ref AssemblyPC);
-                            curJoinBlock.phiInstructions = finalPhis;
-                            //instructionManager.RemoveUnnecessaryPhis(curBasicBlock, ref AssemblyPC);
 
 
                             // Commit all of the phis
@@ -833,6 +752,7 @@ namespace ScannerParser {
                                         new Result(Kind.REG, String.Format("({0})", phi.Value.instructionNum)));
                                 }
 
+                                AssemblyPC++;
                             }
                             else {
                                 foreach (KeyValuePair<int, PhiInstruction> phi in curJoinBlock.phiInstructions) {
@@ -1111,11 +1031,7 @@ namespace ScannerParser {
                     int ID = scanner.String2Id(res1.GetValue());
                     if (ID != -1)
                     {
-
-                        if (curJoinBlock == null || !curJoinBlock.phiInstructions.ContainsKey(ID))
-                            oldVarVal = symbolTable[ID].GetCurrentValue(scopes.Peek());
-                        else
-                            oldVarVal = curJoinBlock.phiInstructions[ID].originalVarVal;
+                        oldVarVal = symbolTable[ID].GetCurrentValue(scopes.Peek());
                         UpdateSymbol(symbolTable[ID], null); // log the line number, current result, etc
                     }
                     AssemblyPC++;
@@ -1123,12 +1039,12 @@ namespace ScannerParser {
                     // create the phi instruction 
                     string symbolName = res1.GetValue();
 
-                    if (curJoinBlock != null) {
+                    if (curJoinBlock != null && joinBlockListForPhis.Count > 0) {
 
                         switch (curJoinBlock.blockType) {
                             case BasicBlock.BlockType.LOOP_HEADER:
                                 if (!curJoinBlock.phiInstructions.ContainsKey(ID)) {
-                                    instructionManager.PutPhiInstruction(AssemblyPC++, curJoinBlock, joinParentBlocks,
+                                    instructionManager.PutPhiInstruction(AssemblyPC++, curJoinBlock,
                                         scanner.String2Id(symbolName), oldVarVal, symbolName);
 
                                     Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
@@ -1142,31 +1058,27 @@ namespace ScannerParser {
                                 }
                                 break;
                             case BasicBlock.BlockType.JOIN:
-                                switch (curBasicBlock.blockType) {
-                                    case BasicBlock.BlockType.TRUE:
-                                        // todo, update true and false blocks to store the ssa val
 
-
+                                        if (!curJoinBlock.phiInstructions.ContainsKey(ID)) {
                                             // There is not currently a phi instruction for the variable
                                             // in the current join block, create it
-                                            instructionManager.PutPhiInstruction(AssemblyPC++, curJoinBlock, joinParentBlocks,
+
+                                            instructionManager.PutPhiInstruction(AssemblyPC++, curJoinBlock,
                                                 scanner.String2Id(symbolName), oldVarVal, symbolName);
 
                                             Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
                                             //Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
+                                        }
+                                        else {
+                                            // A phi instruction for this variable already exists, so we need to
+                                            // modify the first operand to reflect the new value
 
-                                        break;
-                                    case BasicBlock.BlockType.FALSE:
-
-                                            instructionManager.PutPhiInstruction(AssemblyPC++, curJoinBlock, joinParentBlocks,
-                                                scanner.String2Id(symbolName), oldVarVal, symbolName);
+                                            instructionManager.UpdatePhiInstruction(ID, curJoinBlock);
 
                                             Debug.WriteLine("Current join is: {0}", curJoinBlock.blockNum);
                                             //Debug.WriteLine("And outer join is {0}", joinBlockListForPhis.GetOuterJoin().blockNum);
-
-                                        
-                                        break;
-                                }
+                                        }
+                                
                                 break;
                         }
                     }

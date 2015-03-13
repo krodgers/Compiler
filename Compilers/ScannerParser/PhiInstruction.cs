@@ -10,13 +10,10 @@ namespace ScannerParser {
         public Result originalVarVal;
         public string targetVar;
         public int symTableID { get; set; }
-        public string augmentedSymbolID;
-        public bool useMarker;
         public PhiInstruction(int instructionNumber, BasicBlock myBB, Result originalVarVal, string targetVar) : base(instructionNumber, myBB)
         {
             this.originalVarVal = originalVarVal;
             this.targetVar = targetVar;
-            useMarker = false;
         }
 
         // Useful for checking whether this is a necessary phi
