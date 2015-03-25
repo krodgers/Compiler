@@ -300,7 +300,6 @@ namespace ScannerParser {
 
                 } else {
                     // ?
-                    Console.WriteLine("Shouldn't be here...");
                     curr = null;
                 }
 
@@ -388,7 +387,7 @@ namespace ScannerParser {
 
                 } else {
                     // ?
-                    Console.WriteLine("Shouldn't be here...");
+                    curr = null;
                 }
 
             } while(curr.blockNum != head);

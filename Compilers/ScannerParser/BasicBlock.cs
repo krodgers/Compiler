@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -22,12 +23,77 @@ namespace ScannerParser {
         public Dictionary<int, PhiInstruction> phiInstructions;
 
         public BasicBlock(int myNumber) {
+            init();
             blockNum = myNumber;
-            joinPredecessorInstructionCount = 0;
-            instructionCount = 0;
-            phiInstructions = new Dictionary<int, PhiInstruction>();
-            blocksIDominate = new List<BasicBlock>();
         }
+
+        public BasicBlock(int myNumber, int myScope) {
+            init();
+            blockNum = myNumber;
+            scopeNumber = myScope;
+        }
+
+        // Sets the block label based on the special type
+        public BasicBlock(int myNumber, int myScope, BlockType mySpecialType) {
+            init();
+            blockNum = myNumber;
+            scopeNumber = myScope;
+            blockType = mySpecialType;
+            blockLabel = GetLabel(mySpecialType, myNumber);
+        }
+
+        // Intializes all of the things to default values
+        // blocktype gets set to standard
+        private void init() {
+            blockLabel = String.Empty;
+            firstInstruction = null;
+            instructionCount = 0;
+            joinPredecessorInstructionCount = 0;
+            dominatingBlock = null;
+            blocksIDominate = new List<BasicBlock>();
+            parentBlocks = new List<BasicBlock>(); ;
+            childBlocks = new List<BasicBlock>(); ;  // block(s) with the instructions that follow this block's
+            nestingLevel = 0;
+            scopeNumber = 0;
+            blockType = BlockType.STANDARD;
+            phiInstructions = new Dictionary<int, PhiInstruction>();
+
+        }
+
+
+        public void setDominatingInformation(BasicBlock myDominatingBlock) {
+            dominatingBlock = myDominatingBlock;
+        }
+
+        public void setDominatingInformation(BasicBlock myDominatingBlock, int myNestingLevel) {
+            dominatingBlock = myDominatingBlock;
+            nestingLevel = myNestingLevel;
+        }
+
+
+        private string GetLabel(BasicBlock.BlockType type, int blockNum) {
+            switch (type) {
+                case BasicBlock.BlockType.TRUE:
+                    return "TRUE_" + blockNum + ":";
+                case BasicBlock.BlockType.FALSE:
+                    return "FALSE_" + blockNum + ":";
+                case BasicBlock.BlockType.JOIN:
+                    return "JOIN_" + blockNum + ":";
+                case BlockType.LOOP_HEADER:
+                    return "LOOP_HEADER_" + blockNum + ":";
+                case BlockType.LOOP_BODY:
+                    return "LOOP_BODY_" + blockNum + ":";
+                case BlockType.ENTRY:
+                    return "ENTRY";
+                case BlockType.EXIT:
+                    return "EXIT";
+                case BlockType.MAIN_ENTRY:
+                    return "MAIN:";
+                default:
+                    return "block_" + blockNum + ":";
+            }
+        }
+
 
 
         public override string ToString() {

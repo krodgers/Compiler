@@ -14,7 +14,8 @@ namespace ScannerParser {
         public Dotifier(Dictionary<int, BasicBlock> flowGraph) {
             flowGraphNodes = flowGraph;
             dotOut = new StringBuilder();
-            mydocpath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            mydocpath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+           // mydocpath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         }
 
         public void WriteAllBlocksToDot(string fileName, int lastBlockNum)

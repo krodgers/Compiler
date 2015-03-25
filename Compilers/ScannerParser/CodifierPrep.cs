@@ -68,7 +68,7 @@ namespace ScannerParser {
                             i.secondOperand = String.Format("{0}", (numLines - i.instructionNum) +1);
                             i.secondOperandSSAVal = 0;
                         } else {
-                             i.firstOperand = String.Format("{0", bb.firstInstruction.instructionNum - numLines);
+                             i.firstOperand = String.Format("{0}", bb.firstInstruction.instructionNum - numLines);
                              i.firstOperandSSAVal = 0;
                         }
                     }
@@ -137,10 +137,15 @@ namespace ScannerParser {
                     // phis kill assignments
                         resA = changeFirstOper ? lineNumToResult[swapPairs[curInstr.firstOperandSSAVal]] : ReconstructResult(curInstr.firstOperandType, curInstr.firstOperand, AssemblyPC);
                         resB = changeSecondOper ? lineNumToResult[swapPairs[curInstr.secondOperandSSAVal]] : ReconstructResult(curInstr.secondOperandType, curInstr.secondOperand, AssemblyPC);
+
+                        List<int> keysToRemove = new List<int>();
                         foreach (KeyValuePair<int, int> pair in swapPairs) {
                             if (pair.Value == curInstr.firstOperandSSAVal || pair.Value == curInstr.secondOperandSSAVal)
-                                swapPairs.Remove(pair.Key);
+                                keysToRemove.Add(pair.Key);
+//                               swapPairs.Remove(pair.Key);
                         }
+                        foreach (int k in keysToRemove)
+                            swapPairs.Remove(k);
                         break;
                     case Token.PLUS:
                     case Token.MINUS:
