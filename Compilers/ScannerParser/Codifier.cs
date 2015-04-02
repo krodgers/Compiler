@@ -148,7 +148,9 @@ namespace ScannerParser {
                         return 2; // eats cmp _ _ and bra _ _ 
 
                     }
-                    
+
+                case Token.PHI:
+                    return 1;
                 default:
                     Error(String.Format("Unable to classify opcode {0}", opCode));
                     break;

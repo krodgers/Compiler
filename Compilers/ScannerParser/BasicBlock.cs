@@ -98,6 +98,8 @@ namespace ScannerParser {
 
         public override string ToString() {
             StringBuilder builder = new StringBuilder();
+            builder.AppendFormat("{0}", blockLabel);
+            builder.AppendLine();
             builder.AppendFormat("Block Number: {0}", blockNum);
             builder.AppendLine();
             builder.AppendFormat("Nesting Level: {0}", nestingLevel);
