@@ -165,7 +165,7 @@ namespace ScannerParser {
 
         }
 
-                // Returns the final line number ( so that you know what to set AssemblyPC to afterwards)
+        // Returns the final line number ( so that you know what to set AssemblyPC to afterwards)
         // Loads an array reference i.e. a[i][j]
         public static int StoreArrayElement(Result array, Result thingToStore, int[] dims, Result[] indices, int lineNumber) {
             int finalLineNumber;
@@ -244,10 +244,6 @@ namespace ScannerParser {
 
 
         }
-
-
-
-
 
 
         //////////////////////////////////////////////

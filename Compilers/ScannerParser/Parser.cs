@@ -300,19 +300,13 @@ namespace ScannerParser {
             Next();
 
 
-            BasicBlock callBlock = new BasicBlock(nextBBid++);
+            BasicBlock callBlock = new BasicBlock(nextBBid++,scopes.Peek(), BasicBlock.BlockType.FUNCTION_CALL);
             flowGraphNodes[callBlock.blockNum] = callBlock;
-            callBlock.childBlocks = new List<BasicBlock>();
-            callBlock.parentBlocks = new List<BasicBlock>();
-            callBlock.blockType = BasicBlock.BlockType.FUNCTION_CALL;
-            callBlock.scopeNumber = scopes.Peek();
 
-            BasicBlock afterBlock = new BasicBlock(nextBBid++);
+            // todo, it seems to me that the scope should switch when we call a function, maybe? Idon't know, too tired
+            BasicBlock afterBlock = new BasicBlock(nextBBid++, scopes.Peek(), BasicBlock.BlockType.STANDARD);
             flowGraphNodes[afterBlock.blockNum] = afterBlock;
-            afterBlock.childBlocks = new List<BasicBlock>();
-            afterBlock.parentBlocks = new List<BasicBlock>();
-            afterBlock.blockType = BasicBlock.BlockType.STANDARD;
-            afterBlock.scopeNumber = scopes.Peek(); // todo, it seems to me that the scope should switch when we call a function, maybe? Idon't know, too tired
+
             callBlock.childBlocks.Add(afterBlock);
             afterBlock.parentBlocks.Add(callBlock);
 
@@ -1054,11 +1048,7 @@ namespace ScannerParser {
                                 break;
                         }
                     }
-
                 }
-
-
-
             } else {
                 scanner.Error("Ended up at Assignment but didn't encounter let keyword");
             }

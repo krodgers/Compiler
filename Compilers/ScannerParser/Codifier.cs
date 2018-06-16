@@ -19,7 +19,7 @@ namespace ScannerParser {
 
         private StreamWriter sw;
         private int nextExtraSSAVal;
-        private int AssemblyPC, currRegister;
+        private int assemblyPc, currRegister;
         private Dictionary<int,REG> ssaToReg; // maps ssa values to registers
     //    private Dictionary<int, REG> varToReg; // maps vars to registers
         private List<REG> availableRegs;
@@ -46,9 +46,10 @@ namespace ScannerParser {
             symbols = new Dictionary<string, int>();
         }
         public void CloseFiles() {
-            sw.Flush();
-            if (sw != null)
+            if (sw != null) {
+                sw.Flush();
                 sw.Close();
+            }
         }
 
         // Writes error message and exits
@@ -63,7 +64,7 @@ namespace ScannerParser {
 
         // symbolsAndOffsets -- the symbols relevant to the current block
         public void CodifyBlock(BasicBlock bb) {
-            init(); 
+//            init();  // I don't think we want to reset the symbol table and such for every block
             Instruction currInstr = bb.firstInstruction;
             int numInstrUsed = 0;
             while (currInstr != null) {
@@ -190,7 +191,7 @@ namespace ScannerParser {
              else 
                 PutInstruction(opCode, (int)whereToStore, (int)operandB, operandC);
 
-            AssemblyPC++;
+            assemblyPc++;
         }
 
 
@@ -322,11 +323,7 @@ namespace ScannerParser {
                     Error("Symbol uninitialized -- has no SSAVAl on record");
 
                 Load((int)GetRegister(ssaVal), (int)REG.FP, -offset, false);
-
-
-
             }
-
         }
 
 
@@ -341,10 +338,12 @@ namespace ScannerParser {
             }
             ReleaseRegister(restingPlace);
         }
+
         private void Pop(int whereToStore, int memLoc, int offset = -4) {
             // pop A B C --- pop whereToPopTo MemLoc howMuchToDecreaseBy
             PutInstruction("pop", whereToStore, memLoc, offset);
         }
+
         private void Store(int whatToStore, int memBase, int offset, bool offsetIsRegister) {
             if (offsetIsRegister) {
                 PutInstruction("stx", whatToStore, memBase, offset);
@@ -352,6 +351,7 @@ namespace ScannerParser {
                 PutInstruction("stw", whatToStore, memBase, offset);
             }
         }
+        
         private void Load(int whereToStore, int memBase, int offset, bool offsetIsRegister) {
             if (offsetIsRegister) {
                 PutInstruction("ldx", whereToStore, memBase, offset);
@@ -438,18 +438,18 @@ namespace ScannerParser {
         private void PutBranchInstruction(Token opcode, int registerToCheck, int placeToBranch) {
             sw.WriteLine(String.Format("{0} {1} {2}", Utilities.TokenToBranchInstruction(opcode), registerToCheck, placeToBranch));
             Console.WriteLine(String.Format("{0} {1} #{2}", Utilities.TokenToBranchInstruction(opcode), (REG)registerToCheck, placeToBranch));
-            AssemblyPC++;
+            assemblyPc++;
         }
 
         private void PutBranchInstruction(Token opcode, int registerToCheck, string placeToBranch) {
             sw.WriteLine(String.Format("{0} {1} {2}", Utilities.TokenToBranchInstruction(opcode), registerToCheck, placeToBranch));
             Console.WriteLine(String.Format("{0} {1} {2}", Utilities.TokenToBranchInstruction(opcode), (REG)registerToCheck, placeToBranch));
-            AssemblyPC++;
+            assemblyPc++;
         }
         private void PutImmBranchInstruction(Token opcode, int registerToCheck, int placeToBranch) {
             sw.WriteLine(String.Format("{0} {1} {2}", Utilities.TokenToBranchInstruction(opcode), registerToCheck, placeToBranch));
             Console.WriteLine(String.Format("{0} {1} #{2}", Utilities.TokenToBranchInstruction(opcode), (REG)registerToCheck, placeToBranch));
-            AssemblyPC++;        
+            assemblyPc++;        
         }
         
 
@@ -507,58 +507,58 @@ namespace ScannerParser {
         private void PutInstruction(Token opcode, int A, int B, int C) {
             sw.WriteLine(String.Format("{0} {1} {2} {3}", TokenToInstruction(opcode), A, B, C));
             Console.WriteLine(String.Format("{0} {1} {2} {3}", TokenToInstruction(opcode), (REG)A, (REG)B, (REG)C));
-            AssemblyPC++;
+            assemblyPc++;
         }
         private void PutImmInstruction(Token opcode, int A, int B, int C) {
             sw.WriteLine(String.Format("{0}i {1} {2} {3}", TokenToInstruction(opcode), A, B, C));
             Console.WriteLine(String.Format("{0}i {1} {2} #{3}", TokenToInstruction(opcode), (REG)A, (REG)B, C));
-            AssemblyPC++;
+            assemblyPc++;
         }
         private void PutInstruction(string opcode, int A, int B, int C) {
             sw.WriteLine(String.Format("{0} {1} {2} {3}", opcode, A, B, C));
             Console.WriteLine(String.Format("{0} {1} {2} {3}", opcode, (REG)A, (REG)B, (REG)C));
-            AssemblyPC++;
+            assemblyPc++;
 
         }
 
         private void PutInstruction(Token opcode, int A, int B) {
             sw.WriteLine(String.Format("{0} {1} {2}", TokenToInstruction(opcode), A, B));
             Console.WriteLine(String.Format("{0} {1} {2}", TokenToInstruction(opcode), (REG)A, (REG)B));
-            AssemblyPC++;
+            assemblyPc++;
 
         }
         private void PutImmInstruction(Token opcode, int A, int B) {
             sw.WriteLine(String.Format("{0} {1} {2}", TokenToInstruction(opcode), A, B));
             Console.WriteLine(String.Format("{0} {1} #{2}", TokenToInstruction(opcode), (REG)A, B));
-            AssemblyPC++;
+            assemblyPc++;
 
         }
         private void PutInstruction(string opcode, int A, int B) {
             sw.WriteLine(String.Format("{0} {1} {2}", opcode, A, B));
             Console.WriteLine(String.Format("{0} {1} {2}", opcode, (REG)A, (REG)B));
-            AssemblyPC++;
+            assemblyPc++;
 
         }
         private void PutInstruction(Token opcode, int A) {
             sw.WriteLine(String.Format("{0} {1}", TokenToInstruction(opcode), A));
             Console.WriteLine(String.Format("{0} {1}", TokenToInstruction(opcode), (REG)A));
-            AssemblyPC++;
+            assemblyPc++;
 
         }
         private void PutInstruction(string opcode, int A) {
             sw.WriteLine(String.Format("{0} {1}", opcode, A));
             Console.WriteLine(String.Format("{0} {1}", opcode, (REG)A));
-            AssemblyPC++;
+            assemblyPc++;
         }
         private void PutImmInstruction(Token opcode, int A) {
             sw.WriteLine(String.Format("{0} {1}", TokenToInstruction(opcode), A));
             Console.WriteLine(String.Format("{0} #{1}", TokenToInstruction(opcode), A));
-            AssemblyPC++;
+            assemblyPc++;
         }
           private void PutImmInstruction(string opcode, int A) {
             sw.WriteLine(String.Format("{0} {1}", opcode, A));
             Console.WriteLine(String.Format("{0} #{1}", opcode, A));
-            AssemblyPC++;
+            assemblyPc++;
         }
 
 

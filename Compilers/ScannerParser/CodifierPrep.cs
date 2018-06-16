@@ -95,7 +95,7 @@ namespace ScannerParser {
         private static BasicBlock Propagate(BasicBlock curBlock, List<Symbol> symbolTable, ref Dictionary<string, int> variableValues, ref Dictionary<int, int> swapPairs) {
             BasicBlock newblock = CopyBasicBlock(curBlock);
             im.setCurrentBlock(newblock);
-       
+            
             Instruction curInstr = curBlock.firstInstruction;
             Result resA, resB;
             while (curInstr != null) {
@@ -157,12 +157,10 @@ namespace ScannerParser {
                         PutInstruction(Token.PHI, resA, resB, AssemblyPC );
                         if (!lineNumToResult.ContainsKey(curInstr.instructionNum))
                             lineNumToResult.Add(curInstr.instructionNum, new Result(Kind.REG, String.Format("({0})", AssemblyPC)));
+
                         // find the variable this phi is talking about; update the variable value
-                        int ssa1 = -1, ssa2 = -1;
-                        if (curInstr.firstOperandType == Instruction.OperandType.SSA_VAL)
-                            ssa1 = curInstr.firstOperandSSAVal;
-                        if (curInstr.secondOperandType == Instruction.OperandType.SSA_VAL)
-                            ssa2 = curInstr.secondOperandSSAVal;
+                        int ssa1 = curInstr.firstOperandType == Instruction.OperandType.SSA_VAL ? curInstr.firstOperandSSAVal : -1;
+                        int ssa2 = curInstr.secondOperandType == Instruction.OperandType.SSA_VAL ? curInstr.secondOperandSSAVal : -1;
                         foreach (KeyValuePair<string, int> kv in variableValues) {
                             if (kv.Value == ssa1 || kv.Value == ssa2) {
                                 variableValues[kv.Key] = AssemblyPC;
@@ -171,16 +169,24 @@ namespace ScannerParser {
                         }
                         break;
                     case Token.OUTPUTNUM:
-
+                        // check the operand types -- if it's a variable, replace with variable name
 //                        break;
                     case Token.PLUS:
                     case Token.MINUS:
                     case Token.TIMES:
                     case Token.DIV:
+                    // TODO:: propagate new found constant values
+
 
                     default:
-                         resA = changeFirstOper ? lineNumToResult[swapPairs[curInstr.firstOperandSSAVal]] : ReconstructResult(curInstr.firstOperandType, curInstr.firstOperand, AssemblyPC);
-                         resB = changeSecondOper ? lineNumToResult[swapPairs[curInstr.secondOperandSSAVal]] : ReconstructResult(curInstr.secondOperandType, curInstr.secondOperand, AssemblyPC);
+                        resA = changeFirstOper ? lineNumToResult[swapPairs[curInstr.firstOperandSSAVal]] : ReconstructResult(curInstr.firstOperandType, curInstr.firstOperand, AssemblyPC);
+                        resB = changeSecondOper ? lineNumToResult[swapPairs[curInstr.secondOperandSSAVal]] : ReconstructResult(curInstr.secondOperandType, curInstr.secondOperand, AssemblyPC);
+
+                        if (lineNumToResult.ContainsKey(curInstr.firstOperandSSAVal))
+                            resA =  lineNumToResult[curInstr.firstOperandSSAVal];
+                        if (lineNumToResult.ContainsKey(curInstr.secondOperandSSAVal))
+                            resB = lineNumToResult[curInstr.secondOperandSSAVal];
+                                                
 
                          Result newResult = new Result(Kind.REG, String.Format("({0})", AssemblyPC));
                          newResult.lineNumber = AssemblyPC;
