@@ -1,0 +1,6 @@
+addi 1 0 51
+addi 3 0 2
+muli 2 3 51
+add 5 0 2
+wrd 2
+ret 0

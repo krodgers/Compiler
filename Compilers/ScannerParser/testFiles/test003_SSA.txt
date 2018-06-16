@@ -1,0 +1,49 @@
+      FOO:
+1:   write 55
+2:   move #2 b
+3:   move #3 c
+4:   add (2) (3)
+5:   ret (4)
+
+      BAR:
+6:   write 35
+7:   move #3 b
+8 :  move #4 c
+9:   add (7) (8)
+10: ret (9)
+
+      MAIN:
+11: mul #4 #27
+12: add FP A_BASE
+13: adda (11) (12)
+14: store #1 (13)
+15: mul #4 #26
+16: add FP A_BASE
+17: adda (15) (16)
+18: store #2 (17)
+19: mul #4 #27 // load a[0][2][3]
+20: add FP A_BASE
+21: adda (19) (20)
+22: load (21) 
+23:  mul #4 #26
+24: add FP A_BASE
+25: adda (23) (24)
+26: load (25)  // load a[0][2][2]
+27: cmp (22) (26)
+28: ble PC + 6
+
+TRUE BRANCH:
+29: call foo
+30: mul #4 #25 
+31: add FP A_BASE
+32: adda (30) (31)
+33: store EAX (32)
+
+FALSE BRANCH
+34: call foo
+35: mul #4 #25 
+36: add FP A_BASE
+37: adda (30) (31)
+38: store EAX (32)
+
+39: 

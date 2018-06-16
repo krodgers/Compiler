@@ -1,0 +1,15 @@
+addi 1 0 1
+addi 3 0 4
+muli 2 3 1
+add 5 0 2
+cmpi 6 2 1
+bgt 6 2
+addi 2 0 2
+addi 1 2 1
+add 4 0 1
+addi 2 0 1
+addi 1 2 1
+add 4 0 1
+ret 0
+0 1
+ret 0

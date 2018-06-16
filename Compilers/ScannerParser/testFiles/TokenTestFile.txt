@@ -1,0 +1,15 @@
+* / + -
+// comment
+== =! <= >= < >
+<=4
+== 4
+<- 
+3 <- 5
+someName <- 12
+
+. , [] } { ; ()( (   )
+
+then do od fi else let call 
+if while return var array
+function procedure
+main

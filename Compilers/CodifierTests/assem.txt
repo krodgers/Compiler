@@ -1,0 +1,13 @@
+addi 1 0 1
+addi 2 0 1
+addi 4 0 4
+muli 3 32 1
+add 5 0 3
+bgti 6 3 1
+bgt 6 JOIN
+addi 2 0 2
+addi 1 32 1
+add 3 0 1
+addi 2 0 1
+addi 1 32 1
+add 3 0 1

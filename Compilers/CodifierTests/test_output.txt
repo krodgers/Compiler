@@ -1,0 +1,10 @@
+1: mov 1 a
+2: mov 2 b
+3: cmp (1) (2)
+4: ble (3) 3
+5: add (1) 2
+6: branch 2
+7: sub (5) 2
+8: write (5) 
+9: write (7) 
+10: ret  

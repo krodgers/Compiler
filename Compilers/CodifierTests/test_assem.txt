@@ -1,0 +1,10 @@
+addi 1 0 1
+addi 2 0 2
+cmp 3 1 2
+bgt 3 3
+addi 3 1 2
+beq 0 2
+subi 4 3 2
+wrd 3
+wrd 4
+ret 0

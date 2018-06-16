@@ -1,0 +1,14 @@
+MAIN: 
+1: mov 1 a
+2: mov (1) b
+3: mul (2) #4
+4: mov (3) c
+5: cmp (4) (2)
+6: ble (5) FALSE_1
+7: add (2) #2
+8: mov (7) d
+10: bra 2
+11: add (1) (2)
+12: mov (11) e
+13: write (9)
+14: end
